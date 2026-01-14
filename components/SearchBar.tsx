@@ -11,19 +11,16 @@ interface SearchBarProps {
 }
 
 export const SearchBar = ({ onFocus, onBlur }: SearchBarProps) => {
-  const [isFocused, setIsFocused] = useState(false);
   const [query, setQuery] = useState("");
   const router = useRouter();
 
   const handleFocus = () => {
-    setIsFocused(true);
     onFocus?.();
   };
 
   const handleBlur = () => {
     // Delay to allow clicking suggestions
     setTimeout(() => {
-      setIsFocused(false);
       onBlur?.();
     }, 200);
   };
