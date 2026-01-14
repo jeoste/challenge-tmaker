@@ -1,0 +1,131 @@
+# Guide de Déploiement - Reddit Goldmine
+
+## Déploiement sur Vercel
+
+### ✅ Intégration GitHub Native (Recommandé - Plus Simple)
+
+Vercel se connecte directement à votre repository GitHub et déploie automatiquement :
+- **Push sur `main`** → Déploiement en **Production** 🚀
+- **Push sur `dev`** (ou toute autre branche) → Déploiement en **Preview** 🔍
+
+#### Étapes de configuration :
+
+1. **Connecter le repository**
+   - Va sur [Vercel Dashboard](https://vercel.com/dashboard)
+   - Clique sur "Add New Project"
+   - Importe ton repository GitHub
+   - Vercel détectera automatiquement Next.js 15
+
+2. **Configuration automatique**
+   - Framework Preset : Next.js (détecté automatiquement)
+   - Build Command : `npm run build` (par défaut)
+   - Output Directory : `.next` (par défaut)
+   - Install Command : `npm install` (par défaut)
+
+3. **Configuration des branches**
+   - **Production** : `main` ou `master` (configuré automatiquement)
+   - **Preview** : Toutes les autres branches (dont `dev`) - configuré automatiquement
+   
+   > 💡 **Note** : Une fois connecté, chaque push sur `dev` ou `main` déclenchera automatiquement un déploiement. Aucune configuration supplémentaire n'est nécessaire !
+
+4. **Variables d'environnement**
+   - Va dans `Settings > Environment Variables`
+   - Ajoute les variables pour chaque environnement :
+     - **Production** : Variables pour la prod (utilisées pour `main`)
+     - **Preview** : Variables pour les previews (utilisées pour `dev` et autres branches)
+     - **Development** : Variables pour le dev local (optionnel)
+
+## Variables d'environnement requises
+
+### Pour tous les environnements
+
+```env
+# OpenAI (pour les blueprints IA)
+OPENAI_API_KEY=sk-...
+
+# Upstash Redis (cache + rate limiting)
+UPSTASH_REDIS_REST_URL=https://...
+UPSTASH_REDIS_REST_TOKEN=...
+
+# Supabase (base de données)
+NEXT_PUBLIC_SUPABASE_URL=https://...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+
+# App URL
+NEXT_PUBLIC_APP_URL=https://reddit-goldmine.vercel.app
+```
+
+### Configuration par environnement
+
+Dans Vercel, configure les variables pour chaque environnement :
+
+- **Production** : Utilise les vraies clés de production
+- **Preview** : Peut utiliser des clés de staging/test
+- **Development** : Variables locales (`.env.local`)
+
+## Commandes de déploiement manuel
+
+### Via Vercel CLI
+
+```bash
+# Installer Vercel CLI
+npm i -g vercel
+
+# Se connecter
+vercel login
+
+# Déployer en preview
+vercel
+
+# Déployer en production
+vercel --prod
+```
+
+### Déploiements automatiques via GitHub
+
+Avec l'intégration native Vercel, les déploiements se déclenchent automatiquement :
+- **Push sur `dev`** → Déploiement Preview (URL unique par commit)
+- **Push sur `main`** → Déploiement Production (URL principale)
+
+Vercel gère tout automatiquement via l'intégration GitHub.
+
+## Vérification du déploiement
+
+1. **Vérifier les logs**
+   - Dans Vercel Dashboard > Deployments
+   - Clique sur un déploiement pour voir les logs
+
+2. **Tester l'application**
+   - Preview : URL unique générée pour chaque PR/branch
+   - Production : URL principale du projet
+
+3. **Vérifier les erreurs**
+   - Vercel Dashboard > Functions > Logs
+   - Vérifier que les API routes fonctionnent
+
+## Troubleshooting
+
+### Erreur : "Module not found"
+- Vérifier que toutes les dépendances sont dans `package.json`
+- Relancer `npm install` localement
+
+### Erreur : "Environment variables missing"
+- Vérifier que toutes les variables sont configurées dans Vercel
+- Vérifier l'environnement (Production vs Preview)
+
+### Erreur : "Build failed"
+- Vérifier les logs de build dans Vercel
+- Tester le build localement : `npm run build`
+
+## Domaine personnalisé
+
+1. Va dans `Settings > Domains`
+2. Ajoute ton domaine
+3. Suis les instructions DNS
+
+## Monitoring
+
+- **Analytics** : Vercel Analytics (activé par défaut)
+- **Logs** : Vercel Dashboard > Functions > Logs
+- **Performance** : Vercel Dashboard > Analytics

@@ -1,0 +1,23 @@
+# Fichiers à ignorer lors du déploiement Vercel
+
+# Anciens fichiers Vite (optionnel - peut être supprimé après migration complète)
+/src
+vite.config.ts
+vitest.config.ts
+index.html
+tsconfig.app.json
+tsconfig.node.json
+
+# Tests
+**/*.test.ts
+**/*.test.tsx
+**/test/
+**/__tests__/
+
+# Documentation
+*.md
+!README.md
+
+# Config files non nécessaires
+.eslintrc.json
+eslint.config.js

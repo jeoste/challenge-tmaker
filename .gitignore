@@ -41,6 +41,8 @@ lerna-debug.log*
 
 # vercel
 .vercel
+# Note: .vercel/project.json peut être commité si tu veux partager la config
+# Mais généralement on l'ignore pour la sécurité
 
 # typescript
 *.tsbuildinfo
