@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 
 interface GoldScoreBadgeProps {
@@ -9,77 +8,47 @@ interface GoldScoreBadgeProps {
 }
 
 export function GoldScoreBadge({ score, size = 64 }: GoldScoreBadgeProps) {
-  const [displayScore, setDisplayScore] = useState(0);
-
-  useEffect(() => {
-    const duration = 1000; // 1 second
-    const steps = 60;
-    const increment = score / steps;
-    let current = 0;
-    let step = 0;
-
-    const timer = setInterval(() => {
-      step++;
-      current = Math.min(score, increment * step);
-      setDisplayScore(Math.round(current));
-
-      if (step >= steps) {
-        clearInterval(timer);
-        setDisplayScore(score);
-      }
-    }, duration / steps);
-
-    return () => clearInterval(timer);
-  }, [score]);
-
-  const getColor = () => {
-    if (score >= 80) return '#00FF41'; // accent-success
-    if (score >= 50) return '#F59E0B'; // accent-warning
-    return '#6B7280'; // text-muted
+  const getScoreColor = () => {
+    if (score >= 80) return {
+      bg: 'bg-gradient-to-br from-green-500/20 to-emerald-500/20',
+      border: 'border-green-500/50',
+      text: 'text-green-400',
+      glow: 'shadow-[0_0_20px_rgba(34,197,94,0.3)]'
+    };
+    if (score >= 50) return {
+      bg: 'bg-gradient-to-br from-amber-500/20 to-orange-500/20',
+      border: 'border-amber-500/50',
+      text: 'text-amber-400',
+      glow: 'shadow-[0_0_20px_rgba(245,158,11,0.3)]'
+    };
+    return {
+      bg: 'bg-gradient-to-br from-gray-500/20 to-slate-500/20',
+      border: 'border-gray-500/50',
+      text: 'text-gray-400',
+      glow: 'shadow-[0_0_20px_rgba(107,114,128,0.2)]'
+    };
   };
 
-  const circumference = 2 * Math.PI * (size / 2 - 4);
-  const offset = circumference - (displayScore / 100) * circumference;
+  const colors = getScoreColor();
 
   return (
-    <div className="relative" style={{ width: size, height: size }}>
-      <svg
-        width={size}
-        height={size}
-        className="transform -rotate-90"
-      >
-        {/* Background circle */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={size / 2 - 4}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="4"
-          className="text-secondary"
-        />
-        {/* Progress circle */}
-        <motion.circle
-          cx={size / 2}
-          cy={size / 2}
-          r={size / 2 - 4}
-          fill="none"
-          stroke={getColor()}
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          initial={{ strokeDashoffset: circumference }}
-          animate={{ strokeDashoffset: offset }}
-          transition={{ duration: 1, ease: 'easeOut' }}
-        />
-      </svg>
-      <div
-        className="absolute inset-0 flex items-center justify-center font-mono font-bold"
-        style={{ fontSize: size * 0.3, color: getColor() }}
-      >
-        {displayScore}
+    <motion.div
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
+      className={`relative ${colors.bg} ${colors.border} ${colors.glow} border-2 rounded-xl px-4 py-2 backdrop-blur-sm`}
+    >
+      <div className="flex flex-col items-center justify-center">
+        <div className={`text-xs font-semibold uppercase tracking-wider ${colors.text} mb-0.5`}>
+          Gold Score
+        </div>
+        <div className={`text-2xl font-bold ${colors.text} leading-none`}>
+          {score}
+        </div>
+        <div className="text-[10px] text-muted-foreground mt-0.5">
+          /100
+        </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

@@ -109,8 +109,8 @@ export const Pricing = () => {
         {/* Pricing Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
           {/* Free Plan */}
-          <div className="glass-card p-8 relative overflow-hidden">
-            <div className="relative z-10">
+          <div className="glass-card p-8 relative overflow-hidden flex flex-col">
+            <div className="relative z-10 flex flex-col h-full">
               {/* Plan Header */}
               <div className="text-center mb-6">
                 <h3 className="text-2xl font-semibold text-foreground mb-2">
@@ -162,7 +162,7 @@ export const Pricing = () => {
               <Button
                 onClick={handleFreePlan}
                 variant="outline"
-                className="w-full py-6 text-base font-semibold border-primary/20 hover:border-primary/40 hover:bg-primary/5 transition-all duration-300"
+                className="w-full py-6 text-base font-semibold border-primary/20 hover:border-primary/40 hover:bg-primary/5 transition-all duration-300 mt-auto"
               >
                 {freePlan.cta}
               </Button>
@@ -170,7 +170,7 @@ export const Pricing = () => {
           </div>
 
           {/* Premium Plan */}
-          <div className="glass-card p-8 relative overflow-hidden">
+          <div className="glass-card p-8 relative overflow-visible flex flex-col">
             {/* Popular Badge */}
             {premiumPlan.popular && (
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
@@ -185,7 +185,7 @@ export const Pricing = () => {
               <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary/20 via-purple-500/20 to-primary/20 blur-xl" />
             </div>
 
-            <div className="relative z-10">
+            <div className="relative z-10 flex flex-col h-full">
               {/* Plan Header */}
               <div className="text-center mb-6">
                 <h3 className="text-2xl font-semibold text-foreground mb-2">
@@ -237,7 +237,7 @@ export const Pricing = () => {
               <Button
                 onClick={handlePremiumPlan}
                 disabled={loading}
-                className="w-full py-6 text-base font-semibold bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90 text-foreground border-0 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-6 text-base font-semibold bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90 text-foreground border-0 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed mt-auto"
               >
                 {loading ? 'Chargement...' : premiumPlan.cta}
               </Button>

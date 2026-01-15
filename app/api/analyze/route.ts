@@ -430,6 +430,13 @@ export async function POST(request: NextRequest) {
         const pains = await Promise.all(
             topResults.map(async (post, index) => {
                 const blueprint = await generateBlueprint(post);
+                // Build Reddit URL from permalink
+                const redditUrl = post.permalink 
+                    ? (post.permalink.startsWith('http') 
+                        ? post.permalink 
+                        : `https://www.reddit.com${post.permalink}`)
+                    : undefined;
+                
                 return {
                     id: `pain-${index}-${Date.now()}`,
                     title: post.title,
@@ -437,6 +444,7 @@ export async function POST(request: NextRequest) {
                     subreddit: post.subreddit,
                     goldScore: post.goldScore,
                     postsCount: post.postsCount || 1,
+                    permalink: redditUrl,
                     blueprint
                 };
             })

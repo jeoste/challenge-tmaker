@@ -30,6 +30,7 @@ export interface PainPoint {
   subreddit: string;
   goldScore: number;
   postsCount: number;
+  permalink?: string; // Reddit post permalink
   blueprint: Blueprint;
 }
 

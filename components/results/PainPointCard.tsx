@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Copy, Share2, Star } from 'lucide-react';
+import { Copy, Share2, Star, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { GoldScoreBadge } from '@/components/shared/GoldScoreBadge';
@@ -225,6 +225,21 @@ export function PainPointCard({
         <p className="text-sm text-muted-foreground mt-2">
           📊 {painPoint.postsCount} post{painPoint.postsCount > 1 ? 's' : ''} similaire{painPoint.postsCount > 1 ? 's' : ''} cette semaine
         </p>
+        
+        {/* Reddit Post Link */}
+        {painPoint.permalink && (
+          <div className="mt-3">
+            <a
+              href={painPoint.permalink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
+            >
+              <ExternalLink className="h-4 w-4" />
+              <span>View original Reddit post</span>
+            </a>
+          </div>
+        )}
       </div>
 
       {/* Bottom Bento Row: Market, Difficulty, Revenue */}
