@@ -40,8 +40,9 @@ export async function middleware(request: NextRequest) {
   const isAuthPage =
     request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/signup');
+  // Only /share requires authentication (to access saved analyses)
+  // /results is public (no account required per PRD)
   const isProtectedPage =
-    request.nextUrl.pathname.startsWith('/results') ||
     request.nextUrl.pathname.startsWith('/share');
 
   if (isProtectedPage && !session) {

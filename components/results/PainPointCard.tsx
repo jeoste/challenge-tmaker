@@ -40,7 +40,57 @@ export function PainPointCard({
     }
   };
 
-  const renderDifficulty = (difficulty: number = 3) => {
+  const calculateDifficulty = (blueprint: PainPoint['blueprint']): number => {
+    // If difficulty is already provided, use it
+    if (blueprint.difficulty !== undefined) {
+      return Math.max(1, Math.min(5, blueprint.difficulty));
+    }
+
+    // Calculate difficulty based on market size and tech stack complexity
+    let difficulty = 3; // Default medium difficulty
+
+    // Market size impact: Larger markets = easier to enter (lower difficulty)
+    // Smaller markets = harder to enter (higher difficulty)
+    switch (blueprint.marketSize) {
+      case 'Large':
+        difficulty = 2; // Easier - large market means more opportunities
+        break;
+      case 'Medium':
+        difficulty = 3; // Medium
+        break;
+      case 'Small':
+        difficulty = 4; // Harder - niche market requires more expertise
+        break;
+    }
+
+    // Tech stack complexity adjustment
+    const techStack = blueprint.techStack.toLowerCase();
+    
+    // Simple stacks (Next.js + Supabase, etc.) = easier
+    if (techStack.includes('next.js') && techStack.includes('supabase')) {
+      difficulty = Math.max(1, difficulty - 1);
+    }
+    
+    // Complex stacks (microservices, kubernetes, etc.) = harder
+    if (techStack.includes('kubernetes') || techStack.includes('microservices') || 
+        techStack.includes('docker') || techStack.includes('aws')) {
+      difficulty = Math.min(5, difficulty + 1);
+    }
+
+    // MRR estimate impact: Higher estimates might indicate more complexity
+    const mrrMatch = blueprint.mrrEstimate.match(/\$?(\d+)k?/i);
+    if (mrrMatch) {
+      const mrrValue = parseInt(mrrMatch[1], 10);
+      if (mrrValue > 10) {
+        // Higher MRR potential might mean more competition or complexity
+        difficulty = Math.min(5, difficulty + 1);
+      }
+    }
+
+    return Math.max(1, Math.min(5, difficulty));
+  };
+
+  const renderDifficulty = (difficulty: number) => {
     return '⭐'.repeat(difficulty) + '☆'.repeat(5 - difficulty);
   };
 
@@ -88,7 +138,7 @@ export function PainPointCard({
         <div className="bg-secondary/50 rounded-lg p-3 border border-border">
           <div className="text-xs text-muted-foreground mb-1">Difficulty</div>
           <div className="text-sm font-mono">
-            {renderDifficulty()}
+            {renderDifficulty(calculateDifficulty(painPoint.blueprint))}
           </div>
         </div>
         <div className="bg-secondary/50 rounded-lg p-3 border border-border">
@@ -114,13 +164,17 @@ export function PainPointCard({
           variant="outline"
           size="sm"
           onClick={() => {
-            const shareUrl = analysisId
-              ? `${window.location.origin}/share/${analysisId}?pain=${painPoint.id}`
-              : window.location.href;
-            window.open(
-              `https://twitter.com/intent/tweet?text=${encodeURIComponent(`🔥 ${painPoint.blueprint.solutionName} - Gold Score: ${painPoint.goldScore}/100`)}&url=${encodeURIComponent(shareUrl)}`,
-              '_blank'
-            );
+            // Use ShareButton logic for consistency
+            let shareUrl: string;
+            if (analysisId) {
+              shareUrl = `${window.location.origin}/share/${analysisId}?pain=${encodeURIComponent(painPoint.id)}`;
+            } else {
+              shareUrl = `${window.location.origin}/results/${encodeURIComponent(niche)}#pain-${painPoint.id}`;
+            }
+            
+            const text = `🔥 ${painPoint.blueprint.solutionName} - Gold Score: ${painPoint.goldScore}/100`;
+            const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`;
+            window.open(twitterUrl, '_blank', 'width=550,height=420');
           }}
           className="flex items-center gap-2"
         >

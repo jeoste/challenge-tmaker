@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Download, Share2 } from 'lucide-react';
 import Image from 'next/image';
@@ -9,6 +9,7 @@ import Image from 'next/image';
 export default function SharePage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params.id as string;
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
@@ -62,8 +63,14 @@ export default function SharePage() {
     );
   }
 
-  const firstPain = data.pains?.[0];
-  if (!firstPain) {
+  // Get pain point from URL query or default to first
+  const painId = searchParams.get('pain');
+  
+  const selectedPain = painId
+    ? data.pains?.find((p: any) => p.id === painId) || data.pains?.[0]
+    : data.pains?.[0];
+
+  if (!selectedPain || !data.pains || data.pains.length === 0) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="glass-card p-8 text-center">
@@ -76,21 +83,22 @@ export default function SharePage() {
     );
   }
 
-  const ogImageUrl = `/api/og/${encodeURIComponent(data.niche)}?pain=${encodeURIComponent(firstPain.title)}&score=${firstPain.goldScore}`;
+  const ogImageUrl = `/api/og/${encodeURIComponent(data.niche)}?pain=${encodeURIComponent(selectedPain.title)}&score=${selectedPain.goldScore}`;
 
   const handleDownload = () => {
     const link = document.createElement('a');
     link.href = ogImageUrl;
-    link.download = `reddit-goldmine-${data.niche}-${firstPain.goldScore}.png`;
+    link.download = `reddit-goldmine-${data.niche}-${selectedPain.goldScore}.png`;
     link.click();
   };
 
   const handleShare = () => {
     const shareUrl = window.location.href;
-    const text = `🔥 ${firstPain.blueprint.solutionName} - Gold Score: ${firstPain.goldScore}/100`;
+    const text = `🔥 ${selectedPain.blueprint.solutionName} - Gold Score: ${selectedPain.goldScore}/100`;
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`,
-      '_blank'
+      '_blank',
+      'width=550,height=420'
     );
   };
 
@@ -102,11 +110,34 @@ export default function SharePage() {
             🎉 Ton Gold Card est prête !
           </h1>
 
+          {/* Show pain point selector if multiple pain points */}
+          {data.pains && data.pains.length > 1 && (
+            <div className="mb-6">
+              <p className="text-sm text-muted-foreground mb-3 text-center">
+                Sélectionner un pain point à partager :
+              </p>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {data.pains.map((pain: any) => (
+                  <Button
+                    key={pain.id}
+                    variant={selectedPain.id === pain.id ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      router.push(`/share/${id}?pain=${encodeURIComponent(pain.id)}`);
+                    }}
+                  >
+                    {pain.blueprint.solutionName} ({pain.goldScore})
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="mb-8 rounded-lg overflow-hidden border border-border">
             <div className="relative w-full aspect-video bg-black">
               <Image
                 src={ogImageUrl}
-                alt={`Gold Card for ${firstPain.title}`}
+                alt={`Gold Card for ${selectedPain.title}`}
                 fill
                 className="object-cover"
                 unoptimized

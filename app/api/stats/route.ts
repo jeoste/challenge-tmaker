@@ -24,18 +24,35 @@ export async function GET() {
     const twentyFourHoursAgo = new Date();
     twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
 
-    const { data, error } = await supabaseAdmin
-      .from('scan_logs')
-      .select('posts_found')
-      .gte('created_at', twentyFourHoursAgo.toISOString());
+    // Try to fetch from scan_logs, but handle gracefully if table doesn't exist
+    let totalPosts = 0;
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('scan_logs')
+        .select('posts_found')
+        .gte('created_at', twentyFourHoursAgo.toISOString());
 
-    if (error) {
-      console.error('Error fetching stats:', error);
-      // Return cached or default value
+      if (error) {
+        // Table might not exist yet (migrations not run)
+        // Log but don't fail - return default value
+        if (error.code === 'PGRST205' || error.message?.includes('not found')) {
+          console.warn('scan_logs table not found - migrations may not be run yet');
+        } else {
+          console.error('Error fetching stats:', error);
+        }
+        return NextResponse.json({ postsScanned24h: 0 });
+      }
+
+      totalPosts = data?.reduce((sum, log) => sum + (log.posts_found || 0), 0) || 0;
+    } catch (err: any) {
+      // Handle any other errors gracefully
+      if (err.code === 'PGRST205' || err.message?.includes('not found')) {
+        console.warn('scan_logs table not found - migrations may not be run yet');
+      } else {
+        console.error('Error fetching stats:', err);
+      }
       return NextResponse.json({ postsScanned24h: 0 });
     }
-
-    const totalPosts = data?.reduce((sum, log) => sum + (log.posts_found || 0), 0) || 0;
 
     // Cache for 5 minutes - only if Redis is configured
     if (redis) {

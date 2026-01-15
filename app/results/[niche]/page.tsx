@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { ResultsHeader } from '@/components/results/ResultsHeader';
 import { LoadingState } from '@/components/results/LoadingState';
@@ -8,6 +8,7 @@ import { PainPointCard } from '@/components/results/PainPointCard';
 import { Button } from '@/components/ui/button';
 import { AnalyzeResponse } from '@/types';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft, RefreshCw, AlertCircle } from 'lucide-react';
 
 export default function ResultsPage() {
   const params = useParams();
@@ -17,12 +18,31 @@ export default function ResultsPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<AnalyzeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
+  const painPointRefs = useRef<Record<string, HTMLDivElement>>({});
+
+  // Scroll to pain point if hash is present
+  useEffect(() => {
+    if (data && typeof window !== 'undefined') {
+      const hash = window.location.hash;
+      if (hash) {
+        const painId = hash.replace('#pain-', '');
+        const element = painPointRefs.current[painId];
+        if (element) {
+          setTimeout(() => {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 300);
+        }
+      }
+    }
+  }, [data]);
 
   useEffect(() => {
     const fetchResults = async () => {
       try {
         setLoading(true);
         setError(null);
+        setErrorDetails(null);
 
         const response = await fetch('/api/analyze', {
           method: 'POST',
@@ -33,22 +53,38 @@ export default function ResultsPage() {
         });
 
         if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          
           if (response.status === 401) {
-            router.push('/login');
+            setError('Authentification requise');
+            setErrorDetails('Vous devez être connecté pour effectuer un scan.');
+            setTimeout(() => router.push('/login'), 2000);
             return;
           }
+          
           if (response.status === 429) {
-            setError('Trop de requêtes. Veuillez réessayer dans une heure.');
+            setError('Limite de requêtes atteinte');
+            setErrorDetails('Vous avez atteint la limite de 5 scans par heure. Veuillez réessayer plus tard.');
             return;
           }
-          throw new Error('Erreur lors du scan');
+          
+          if (response.status === 400) {
+            setError('Requête invalide');
+            setErrorDetails(errorData.error || 'La niche spécifiée est invalide.');
+            return;
+          }
+          
+          setError('Erreur lors du scan');
+          setErrorDetails(errorData.error || 'Une erreur est survenue. Veuillez réessayer.');
+          return;
         }
 
         const result = await response.json();
         setData(result);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error fetching results:', err);
-        setError('Une erreur est survenue lors du scan.');
+        setError('Erreur de connexion');
+        setErrorDetails(err.message || 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.');
       } finally {
         setLoading(false);
       }
@@ -74,13 +110,58 @@ export default function ResultsPage() {
         <div className="max-w-6xl mx-auto">
           <ResultsHeader niche={niche} />
           <div className="glass-card p-8 text-center">
-            <h2 className="text-2xl font-bold text-foreground mb-4">
-              Erreur
+            <div className="mb-6 flex justify-center">
+              <div className="relative">
+                <div className="absolute inset-0 rounded-full bg-destructive/20 blur-xl" />
+                <div className="relative w-16 h-16 rounded-full bg-destructive/10 border border-destructive/30 flex items-center justify-center">
+                  <AlertCircle className="w-8 h-8 text-destructive" />
+                </div>
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold text-foreground mb-3">
+              {error}
             </h2>
-            <p className="text-muted-foreground mb-6">{error}</p>
-            <Button onClick={() => router.push('/')}>
-              Nouvelle Recherche
-            </Button>
+            {errorDetails && (
+              <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                {errorDetails}
+              </p>
+            )}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button 
+                onClick={() => router.push('/')}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Nouvelle Recherche
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => {
+                  setError(null);
+                  setErrorDetails(null);
+                  setLoading(true);
+                  // Retry fetch
+                  fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ niche }),
+                  })
+                    .then(res => res.json())
+                    .then(result => {
+                      setData(result);
+                      setLoading(false);
+                    })
+                    .catch(() => {
+                      setError('Erreur lors du scan');
+                      setLoading(false);
+                    });
+                }}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Réessayer
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -96,12 +177,24 @@ export default function ResultsPage() {
             <h2 className="text-2xl font-bold text-foreground mb-4">
               Aucun pain point trouvé
             </h2>
-            <p className="text-muted-foreground mb-6">
-              Essaie une autre niche ou vérifie plus tard.
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+              Aucune opportunité SaaS n'a été trouvée pour cette niche. 
+              Essayez une autre niche ou vérifiez plus tard.
             </p>
-            <Button onClick={() => router.push('/')}>
-              Nouvelle Recherche
-            </Button>
+            {data && (
+              <p className="text-sm text-muted-foreground mb-6">
+                {data.totalPosts} posts scannés • Aucun résultat valide
+              </p>
+            )}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button 
+                onClick={() => router.push('/')}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Nouvelle Recherche
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -123,14 +216,38 @@ export default function ResultsPage() {
 
         <div className="space-y-6">
           {data.pains.map((pain, index) => (
-            <PainPointCard
+            <div
               key={pain.id}
-              painPoint={pain}
-              niche={niche}
-              analysisId={data.id}
-              index={index}
-            />
+              ref={(el) => {
+                if (el) painPointRefs.current[pain.id] = el;
+              }}
+              id={`pain-${pain.id}`}
+            >
+              <PainPointCard
+                painPoint={pain}
+                niche={niche}
+                analysisId={data.id}
+                index={index}
+              />
+            </div>
           ))}
+        </div>
+
+        {/* Bottom CTA */}
+        <div className="mt-12 text-center">
+          <div className="glass-card p-6 inline-block">
+            <p className="text-muted-foreground mb-4">
+              Vous voulez analyser une autre niche ?
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => router.push('/')}
+              className="flex items-center gap-2 mx-auto"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Nouvelle Recherche
+            </Button>
+          </div>
         </div>
       </div>
     </div>

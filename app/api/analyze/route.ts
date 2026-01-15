@@ -22,24 +22,23 @@ export async function POST(request: NextRequest) {
     const startTime = Date.now();
     
     try {
-        // 0. Authentication check
+        // Authentication is optional (per PRD: "100% gratuit • Pas de compte requis")
+        // If authenticated, use user_id; otherwise use IP for rate limiting
         const session = await getServerSession();
-        if (!session) {
-            return NextResponse.json(
-                { error: 'Authentication required' },
-                { status: 401 }
-            );
-        }
-
-        const userId = session.user.id;
+        const userId = session?.user?.id || null;
+        const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                   request.headers.get('x-real-ip') || 
+                   'anonymous';
+        
         const { niche } = await request.json();
 
         if (!niche) {
             return NextResponse.json({ error: 'Niche is required' }, { status: 400 });
         }
 
-        // 1. Rate limiting (using user_id instead of IP)
-        const rateLimit = await checkRateLimit(userId);
+        // 1. Rate limiting (using user_id if authenticated, otherwise IP)
+        const rateLimitIdentifier = userId || ip;
+        const rateLimit = await checkRateLimit(rateLimitIdentifier);
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 { error: 'Rate limit exceeded. Max 5 scans per hour.' },
@@ -184,42 +183,49 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // 10. Save to Supabase
-        const { data: analysisData, error: analysisError } = await supabaseAdmin
-            .from('reddit_analyses')
-            .insert({
-                user_id: userId,
-                niche,
-                scanned_at: new Date().toISOString(),
-                total_posts: posts.length,
-                pains: pains
-            })
-            .select()
-            .single();
+        // 10. Save to Supabase (only if authenticated)
+        let analysisData = null;
+        if (userId) {
+            const { data, error: analysisError } = await supabaseAdmin
+                .from('reddit_analyses')
+                .insert({
+                    user_id: userId,
+                    niche,
+                    scanned_at: new Date().toISOString(),
+                    total_posts: posts.length,
+                    pains: pains
+                })
+                .select()
+                .single();
 
-        if (analysisError) {
-            console.error('Error saving to Supabase:', analysisError);
-            // Continue even if Supabase save fails
+            if (analysisError) {
+                console.error('Error saving to Supabase:', analysisError);
+                // Continue even if Supabase save fails
+            } else {
+                analysisData = data;
+            }
         }
 
-        // 11. Log metrics
-        const duration = Date.now() - startTime;
-        const ip = request.headers.get('x-forwarded-for') || 'unknown';
-        
-        await supabaseAdmin
-            .from('scan_logs')
-            .insert({
-                user_id: userId,
-                niche,
-                duration_ms: duration,
-                posts_found: posts.length,
-                pains_generated: pains.length,
-                ip_address: ip
-            })
-            .catch(err => {
-                console.error('Error logging metrics:', err);
-                // Don't fail the request if logging fails
-            });
+        // 11. Log metrics (only if table exists and user is authenticated)
+        if (userId) {
+            const duration = Date.now() - startTime;
+            await supabaseAdmin
+                .from('scan_logs')
+                .insert({
+                    user_id: userId,
+                    niche,
+                    duration_ms: duration,
+                    posts_found: posts.length,
+                    pains_generated: pains.length,
+                    ip_address: ip
+                })
+                .catch(err => {
+                    // Silently fail if table doesn't exist (migrations not run)
+                    if (err.code !== 'PGRST205' && !err.message?.includes('not found')) {
+                        console.error('Error logging metrics:', err);
+                    }
+                });
+        }
 
         // Include analysis ID in response if saved successfully
         const response = analysisData 

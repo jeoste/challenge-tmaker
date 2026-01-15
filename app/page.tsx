@@ -11,12 +11,12 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-mesh bg-grid">
       <Header />
-      
+
       {/* Hero Section */}
       <main className="relative flex flex-col items-center justify-center min-h-screen px-6 pt-20">
         {/* Ambient glow */}
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-primary/5 blur-[120px] rounded-full pointer-events-none" />
-        
+
         <div className="relative z-10 w-full max-w-4xl mx-auto text-center">
           {/* Headline */}
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-semibold text-foreground mb-4 tracking-tight">
@@ -31,7 +31,7 @@ export default function Home() {
           </p>
 
           {/* Search Bar */}
-          <SearchBar 
+          <SearchBar
             onFocus={() => setShowSuggestions(true)}
             onBlur={() => setShowSuggestions(false)}
           />

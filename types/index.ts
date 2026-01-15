@@ -17,6 +17,7 @@ export interface Blueprint {
   firstChannel: string;
   mrrEstimate: string;
   techStack: string;
+  difficulty?: number; // 1-5, optional (can be calculated if not provided)
 }
 
 export interface PainPoint {

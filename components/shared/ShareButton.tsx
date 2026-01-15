@@ -19,30 +19,44 @@ interface ShareButtonProps {
 
 export function ShareButton({ painPoint, niche, analysisId }: ShareButtonProps) {
   const handleShare = async () => {
-    const shareUrl = analysisId
-      ? `${window.location.origin}/share/${analysisId}?pain=${painPoint.id}`
-      : window.location.href;
+    // Generate share URL with fallback
+    let shareUrl: string;
+    if (analysisId) {
+      shareUrl = `${window.location.origin}/share/${analysisId}?pain=${encodeURIComponent(painPoint.id)}`;
+    } else {
+      // Fallback: use current results page with pain point ID in hash
+      shareUrl = `${window.location.origin}/results/${encodeURIComponent(niche)}#pain-${painPoint.id}`;
+    }
 
+    // Generate OG image URL (always accessible)
     const ogImageUrl = `${window.location.origin}/api/og/${encodeURIComponent(niche)}?pain=${encodeURIComponent(painPoint.title)}&score=${painPoint.goldScore}`;
 
-    const text = `🔥 Top Opportunity: ${painPoint.blueprint.solutionName}\n\nGold Score: ${painPoint.goldScore}/100\n\n${shareUrl}`;
+    // Share text optimized for Twitter/X
+    const text = `🔥 ${painPoint.blueprint.solutionName}\n\nGold Score: ${painPoint.goldScore}/100\n\n${shareUrl}`;
 
+    // Try native share API first (mobile)
     if (navigator.share) {
       try {
         await navigator.share({
           title: painPoint.blueprint.solutionName,
-          text,
+          text: `🔥 ${painPoint.blueprint.solutionName} - Gold Score: ${painPoint.goldScore}/100`,
           url: shareUrl,
         });
-      } catch (error) {
-        // User cancelled or error occurred
-        console.error('Share error:', error);
+        toast.success('Partagé avec succès !');
+        return;
+      } catch (error: any) {
+        // User cancelled is not an error
+        if (error.name !== 'AbortError') {
+          console.error('Share error:', error);
+        } else {
+          return; // User cancelled, don't show error
+        }
       }
-    } else {
-      // Fallback: copy to clipboard
-      await navigator.clipboard.writeText(text);
-      toast.success('Lien copié dans le presse-papier !');
     }
+
+    // Fallback: Twitter/X share
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`;
+    window.open(twitterUrl, '_blank', 'width=550,height=420');
   };
 
   return (

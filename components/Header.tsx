@@ -20,16 +20,18 @@ export const Header = () => {
     <header className="fixed top-0 left-0 right-0 z-50">
       <div className="mx-auto max-w-7xl px-6 py-4">
         <div className="flex items-center justify-between">
-          <Logo />
+          <Link href="/" className="hover:opacity-80 transition-opacity">
+            <Logo />
+          </Link>
           <nav className="hidden md:flex items-center gap-6">
-            <Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Explore
+            <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Home
             </Link>
-            <Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Trends
+            <Link href="/how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              How it works
             </Link>
-            <Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              API
+            <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Pricing
             </Link>
           </nav>
           <div className="flex items-center gap-4">
@@ -49,12 +51,23 @@ export const Header = () => {
                     </Button>
                   </>
                 ) : (
-                  <Button
-                    size="sm"
-                    onClick={() => router.push('/login')}
-                  >
-                    Se connecter
-                  </Button>
+                  <>
+                    <Link href="/signup">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="hidden sm:inline-flex"
+                      >
+                        S'inscrire
+                      </Button>
+                    </Link>
+                    <Button
+                      size="sm"
+                      onClick={() => router.push('/login')}
+                    >
+                      Se connecter
+                    </Button>
+                  </>
                 )}
               </>
             )}

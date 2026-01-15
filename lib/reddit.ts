@@ -59,17 +59,18 @@ export async function fetchRedditPosts(
 }
 
 export function getSubredditsForNiche(niche: string): string[] {
-  const mapping: Record<string, string[]> = {
-    'recrutement': ['recruitinghell', 'jobs', 'careerguidance', 'humanresources'],
-    'notion': ['Notion', 'productivity', 'selfhosted'],
-    'fitness': ['fitness', 'bodyweightfitness', 'nutrition', 'personaltraining'],
-    'saas': ['SaaS', 'microsaas', 'startups', 'entrepreneur'],
-    'devtools': ['webdev', 'programming', 'SideProject', 'reactjs']
-  };
-  
-  // Default fallback if niche isn't pre-mapped: try to use the niche itself as a subreddit + 'all' isn't quite right for a specific niche scan, 
-  // maybe just return the niche itself as a subreddit + related generic ones?
-  // For now, let's treat the niche key as a generic search term or direct subreddit if applicable, 
-  // but strictly following PRD fallback:
-  return mapping[niche.toLowerCase()] || [niche.replace(/\s+/g, ''), 'Entrepreneur', 'SaaS']; 
+    const mapping: Record<string, string[]> = {
+        'recruitment': ['recruitinghell', 'jobs', 'careerguidance', 'humanresources'],
+        'recrutement': ['recruitinghell', 'jobs', 'careerguidance', 'humanresources'], // French variant
+        'notion': ['Notion', 'productivity', 'selfhosted'],
+        'fitness': ['fitness', 'bodyweightfitness', 'nutrition', 'personaltraining'],
+        'saas': ['SaaS', 'microsaas', 'startups', 'entrepreneur'],
+        'devtools': ['webdev', 'programming', 'SideProject', 'reactjs']
+    };
+    
+    // Normalize niche to lowercase for lookup
+    const normalizedNiche = niche.toLowerCase().trim();
+    
+    // Return mapped subreddits or fallback
+    return mapping[normalizedNiche] || [normalizedNiche.replace(/\s+/g, ''), 'Entrepreneur', 'SaaS']; 
 }
