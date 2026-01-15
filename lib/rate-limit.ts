@@ -286,3 +286,68 @@ export async function checkRapidApiRateLimit(
         reset
     };
 }
+
+// Gemini API rate limiters (GLOBAL - shared across all users)
+// Free tier limits: ~5 RPM (requests per minute), 100 RPD (requests per day) for gemini-1.5-pro
+// We use conservative limits: 4 RPM, 80 RPD to stay safe
+export const geminiRateLimitPerMinute = redis
+    ? new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(4, '1 m'), // 4 requests per minute (safe margin from 5 RPM limit)
+        prefix: 'gemini:rpm:', // Requests per minute namespace
+    })
+    : null;
+
+export const geminiRateLimitPerDay = redis
+    ? new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(80, '24 h'), // 80 requests per day (safe margin from 100 RPD limit)
+        prefix: 'gemini:rpd:', // Requests per day namespace
+    })
+    : null;
+
+/**
+ * Check Gemini API rate limits (GLOBAL - shared across all users)
+ * Limits: 4 RPM, 80 RPD (conservative limits to stay within free tier)
+ * Returns both RPM and RPD status
+ */
+export async function checkGeminiRateLimit() {
+    // If rate limiting is not configured, allow but log warning
+    if (!geminiRateLimitPerMinute || !geminiRateLimitPerDay) {
+        console.warn('[Gemini Rate Limit] Redis not configured, allowing request (no rate limiting)');
+        return {
+            allowed: true,
+            rpm: { allowed: true, limit: 4, remaining: 4, reset: Date.now() + 60000 },
+            rpd: { allowed: true, limit: 80, remaining: 80, reset: Date.now() + 86400000 }
+        };
+    }
+
+    // Check both RPM and RPD limits
+    const rpmCheck = await geminiRateLimitPerMinute.limit('global');
+    const rpdCheck = await geminiRateLimitPerDay.limit('global');
+
+    const allowed = rpmCheck.success && rpdCheck.success;
+
+    if (!allowed) {
+        console.warn('[Gemini Rate Limit] BLOCKED:', {
+            rpm: { allowed: rpmCheck.success, remaining: rpmCheck.remaining, reset: new Date(rpmCheck.reset).toISOString() },
+            rpd: { allowed: rpdCheck.success, remaining: rpdCheck.remaining, reset: new Date(rpdCheck.reset).toISOString() }
+        });
+    }
+
+    return {
+        allowed,
+        rpm: {
+            allowed: rpmCheck.success,
+            limit: 4,
+            remaining: rpmCheck.remaining,
+            reset: rpmCheck.reset
+        },
+        rpd: {
+            allowed: rpdCheck.success,
+            limit: 80,
+            remaining: rpdCheck.remaining,
+            reset: rpdCheck.reset
+        }
+    };
+}

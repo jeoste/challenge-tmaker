@@ -3,6 +3,7 @@ import { google } from '@ai-sdk/google';
 import { generateText } from 'ai';
 import { RedditPost } from './reddit';
 import { calculateGoldScore } from './scoring';
+import { checkGeminiRateLimit } from './rate-limit';
 
 // Get Gemini API key from environment
 // IMPORTANT: @ai-sdk/google reads GOOGLE_GENERATIVE_AI_API_KEY by default
@@ -46,6 +47,14 @@ export interface LLMAnalysis {
 export async function batchLLMAnalysis(
     posts: RedditPost[]
 ): Promise<Array<RedditPost & { isOpportunity: boolean; relevanceScore: number }>> {
+    // Check Gemini API rate limits before making the call
+    const rateLimitCheck = await checkGeminiRateLimit();
+    if (!rateLimitCheck.allowed) {
+        console.warn('[LLM] Gemini API rate limit exceeded. RPM remaining:', rateLimitCheck.rpm.remaining, 'RPD remaining:', rateLimitCheck.rpd.remaining);
+        // Return all posts as opportunities (fallback behavior)
+        return posts.map(p => ({ ...p, isOpportunity: true, relevanceScore: 1.0 }));
+    }
+    
     // Include engagement metrics in the prompt to help prioritize viral posts
     const postsList = posts.map((p, i) => 
         `${i}. "${p.title}" (${p.score} upvotes, ${p.num_comments} comments, r/${p.subreddit})\n   Contexte: ${p.selftext.substring(0, 300)}`
@@ -260,6 +269,13 @@ RÈGLES ABSOLUES - VÉRIFIE AVANT DE RÉPONDRE:
 Réponds UNIQUEMENT en JSON valide, pas de markdown, pas de texte avant ou après.`;
 
     try {
+        // Check Gemini API rate limits before making the call
+        const rateLimitCheck = await checkGeminiRateLimit();
+        if (!rateLimitCheck.allowed) {
+            console.warn('[LLM] Gemini API rate limit exceeded. RPM remaining:', rateLimitCheck.rpm.remaining, 'RPD remaining:', rateLimitCheck.rpd.remaining);
+            throw new Error('QUOTA_EXCEEDED: Gemini API rate limit exceeded. Please wait before retrying.');
+        }
+        
         // Ensure GOOGLE_GENERATIVE_AI_API_KEY is set (required by @ai-sdk/google)
         const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY;
         
@@ -279,6 +295,7 @@ Réponds UNIQUEMENT en JSON valide, pas de markdown, pas de texte avant ou aprè
         
         try {
             console.log('[LLM] Attempting to generate blueprint with gemini-1.5-pro...');
+            console.log('[LLM] Rate limit status - RPM remaining:', rateLimitCheck.rpm.remaining, 'RPD remaining:', rateLimitCheck.rpd.remaining);
             const result = await generateText({
                 model,
                 prompt,

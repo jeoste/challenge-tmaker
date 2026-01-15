@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { redis } from '@/lib/cache';
-import { checkRateLimit, checkSerperRateLimit, checkRapidApiRateLimit, isIPWhitelisted } from '@/lib/rate-limit';
+import { checkRateLimit, checkSerperRateLimit, checkRapidApiRateLimit, isIPWhitelisted, checkGeminiRateLimit } from '@/lib/rate-limit';
 import { fetchRedditPosts, getSubredditsForNiche } from '@/lib/reddit';
 import { searchRedditViaSerper, serperResultToRedditPost } from '@/lib/serper';
 import { getSubredditInfo, searchRedditPosts, rapidApiPostToRedditPost } from '@/lib/rapidapi-reddit';
@@ -452,13 +452,46 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // 8. Generate blueprints (top 10 for premium, top 3 for free)
-        const maxResults = userPlan === 'free' ? 3 : 10;
+        // 8. Generate blueprints with rate limiting and serialization
+        // Check Gemini rate limits to determine how many blueprints we can generate
+        const geminiRateLimit = await checkGeminiRateLimit();
+        
+        // Calculate max results based on rate limits and user plan
+        let maxResults = userPlan === 'free' ? 3 : 10;
+        
+        // Reduce maxResults if we're approaching daily limit (leave 20% margin)
+        if (geminiRateLimit.rpd.remaining < 20) {
+            maxResults = Math.min(maxResults, Math.floor(geminiRateLimit.rpd.remaining * 0.8));
+            console.log(`[Gemini Rate Limit] Reduced maxResults to ${maxResults} due to low daily quota (${geminiRateLimit.rpd.remaining} remaining)`);
+        }
+        
+        // Further reduce if we're approaching per-minute limit
+        if (geminiRateLimit.rpm.remaining < 3) {
+            maxResults = Math.min(maxResults, geminiRateLimit.rpm.remaining);
+            console.log(`[Gemini Rate Limit] Reduced maxResults to ${maxResults} due to low per-minute quota (${geminiRateLimit.rpm.remaining} remaining)`);
+        }
+        
         const topResults = filteredResults.slice(0, maxResults);
-        console.log(`[Plan] Generating ${topResults.length} blueprints for ${userPlan} plan`);
-        const pains = await Promise.all(
-            topResults.map(async (post, index) => {
+        console.log(`[Plan] Generating ${topResults.length} blueprints for ${userPlan} plan (RPM: ${geminiRateLimit.rpm.remaining}, RPD: ${geminiRateLimit.rpd.remaining})`);
+        
+        // Serialize blueprint generation with delays to respect rate limits
+        // Delay between calls: 15 seconds (to stay under 4 RPM = 1 call per 15 seconds)
+        const DELAY_BETWEEN_CALLS_MS = 15000; // 15 seconds = 4 calls per minute
+        
+        const pains = [];
+        for (let index = 0; index < topResults.length; index++) {
+            const post = topResults[index];
+            
+            // Check rate limit before each call
+            const currentRateLimit = await checkGeminiRateLimit();
+            if (!currentRateLimit.allowed) {
+                console.warn(`[Gemini Rate Limit] Stopping blueprint generation at index ${index}/${topResults.length} due to rate limit`);
+                break;
+            }
+            
+            try {
                 const blueprint = await generateBlueprint(post);
+                
                 // Build Reddit URL from permalink
                 const redditUrl = post.permalink 
                     ? (post.permalink.startsWith('http') 
@@ -466,7 +499,7 @@ export async function POST(request: NextRequest) {
                         : `https://www.reddit.com${post.permalink}`)
                     : undefined;
                 
-                return {
+                pains.push({
                     id: `pain-${index}-${Date.now()}`,
                     title: post.title,
                     selftext: post.selftext || '',
@@ -475,9 +508,48 @@ export async function POST(request: NextRequest) {
                     postsCount: post.postsCount || 1,
                     permalink: redditUrl,
                     blueprint
-                };
-            })
-        );
+                });
+                
+                // Wait before next call (except for the last one)
+                if (index < topResults.length - 1) {
+                    console.log(`[Gemini Rate Limit] Waiting ${DELAY_BETWEEN_CALLS_MS}ms before next blueprint generation...`);
+                    await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CALLS_MS));
+                }
+            } catch (error: any) {
+                console.error(`[Gemini Rate Limit] Error generating blueprint for post ${index}:`, error?.message);
+                // If it's a quota error, stop generating more blueprints
+                if (error?.message?.includes('QUOTA_EXCEEDED') || error?.message?.includes('rate limit')) {
+                    console.warn(`[Gemini Rate Limit] Stopping blueprint generation due to quota error`);
+                    break;
+                }
+                // For other errors, continue with fallback blueprint
+                const redditUrl = post.permalink 
+                    ? (post.permalink.startsWith('http') 
+                        ? post.permalink 
+                        : `https://www.reddit.com${post.permalink}`)
+                    : undefined;
+                pains.push({
+                    id: `pain-${index}-${Date.now()}`,
+                    title: post.title,
+                    selftext: post.selftext || '',
+                    subreddit: post.subreddit,
+                    goldScore: post.goldScore,
+                    postsCount: post.postsCount || 1,
+                    permalink: redditUrl,
+                    blueprint: {
+                        problem: post.title,
+                        whyPainPoint: `Post avec ${post.score} upvotes et ${post.num_comments} commentaires, indiquant un besoin validé par la communauté.`,
+                        solutionName: 'Solution à développer',
+                        solutionPitch: 'Analyse le problème et développe une solution.',
+                        howItSolves: 'La solution adresse directement le problème identifié dans le post Reddit.',
+                        marketSize: 'Medium' as const,
+                        firstChannel: 'Reddit',
+                        mrrEstimate: '$2k-$5k',
+                        techStack: 'Next.js + Supabase',
+                    }
+                });
+            }
+        }
 
         // 9. Cache results
         const result = {
