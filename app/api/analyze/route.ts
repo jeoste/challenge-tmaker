@@ -1,8 +1,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { redis } from '@/lib/cache';
-import { checkRateLimit, isIPWhitelisted } from '@/lib/rate-limit';
+import { checkRateLimit, checkSerperRateLimit, checkRapidApiRateLimit, isIPWhitelisted } from '@/lib/rate-limit';
 import { fetchRedditPosts, getSubredditsForNiche } from '@/lib/reddit';
+import { searchRedditViaSerper, serperResultToRedditPost } from '@/lib/serper';
+import { getSubredditInfo, searchRedditPosts, rapidApiPostToRedditPost } from '@/lib/rapidapi-reddit';
 import { quickFilter, calculateGoldScore } from '@/lib/scoring';
 import { batchLLMAnalysis, generateBlueprint } from '@/lib/llm';
 import { supabaseAdmin, getServerSession, getUserPlan } from '@/lib/supabase-server';
@@ -135,13 +137,132 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // 3. Fetch Reddit
+        // 3. Fetch Reddit data
         const subreddits = getSubredditsForNiche(niche);
-        // Fetch from all subreddits in parallel
+        
+        // 3.0. Optionally enrich with RapidAPI (VERY limited - 50/month total)
+        // Use reddit3 for search and reddit34 for subreddit metadata
+        let subredditMetadata: Record<string, any> = {};
+        const rapidApiRateLimit = await checkRapidApiRateLimit(
+            `rapidapi:user:${userId}`,
+            ipWhitelisted,
+            userPlan
+        );
+        
+        if (rapidApiRateLimit.allowed && process.env.RAPID_API_KEY && subreddits.length > 0) {
+            try {
+                // 3.0.1. Search posts using reddit3 (high-value operation)
+                // Use niche as search query on primary subreddit
+                const primarySubreddit = subreddits[0];
+                const rapidApiPosts = await searchRedditPosts(
+                    niche,
+                    primarySubreddit,
+                    'week',
+                    'relevance'
+                );
+                
+                if (rapidApiPosts.length > 0) {
+                    console.log(`[RapidAPI] Found ${rapidApiPosts.length} posts via reddit3 search`);
+                    const convertedPosts = rapidApiPosts.map(rapidApiPostToRedditPost);
+                    // Merge with existing posts, avoiding duplicates
+                    const existingIds = new Set(posts.map(p => p.id));
+                    const newPosts = convertedPosts.filter(p => !existingIds.has(p.id));
+                    if (newPosts.length > 0) {
+                        posts = removeDuplicates([...posts, ...newPosts]);
+                        console.log(`[RapidAPI] Added ${newPosts.length} new posts from reddit3`);
+                    }
+                }
+                
+                // 3.0.2. Get subreddit metadata using reddit34 (only if premium and quota allows)
+                // For free users, skip metadata to conserve quota for search
+                if (userPlan === 'premium') {
+                    // Check if we still have quota after the search
+                    const rapidApiRateLimitAfter = await checkRapidApiRateLimit(
+                        `rapidapi:user:${userId}`,
+                        ipWhitelisted,
+                        userPlan
+                    );
+                    
+                    if (rapidApiRateLimitAfter.allowed) {
+                        const subredditInfo = await getSubredditInfo(primarySubreddit);
+                        if (subredditInfo) {
+                            subredditMetadata[primarySubreddit] = subredditInfo;
+                            console.log(`[RapidAPI] Fetched metadata for r/${primarySubreddit}: ${subredditInfo.subscribers || 'unknown'} subscribers`);
+                        }
+                    }
+                } else {
+                    console.log('[RapidAPI] Skipping subreddit metadata for free plan to conserve quota for search');
+                }
+            } catch (error) {
+                console.error('[RapidAPI] Error enriching with RapidAPI data:', error);
+                // Continue without RapidAPI data - not critical
+            }
+        } else {
+            if (!process.env.RAPID_API_KEY) {
+                console.log('[RapidAPI] RAPID_API_KEY not configured. Skipping RapidAPI enrichment.');
+            } else {
+                console.log(`[RapidAPI] Rate limit exceeded. Remaining: ${rapidApiRateLimit.remaining}. Skipping RapidAPI enrichment.`);
+            }
+        }
+        
+        // 3.1. Fetch from Reddit API directly (primary source)
         const postsResults = await Promise.all(
             subreddits.map(sub => fetchRedditPosts(sub, 'week'))
         );
-        const posts = removeDuplicates(postsResults.flat());
+        let posts = removeDuplicates(postsResults.flat());
+        
+        // 3.2. Enrich with Serper API (if rate limit allows and API key is configured)
+        const serperRateLimit = await checkSerperRateLimit(
+            `serper:user:${userId}`,
+            ipWhitelisted,
+            userPlan
+        );
+        
+        if (serperRateLimit.allowed && process.env.SERPER_DEV_API_KEY) {
+            console.log(`[Serper] Rate limit check passed. Remaining: ${serperRateLimit.remaining}`);
+            
+            try {
+                // Search via Serper for each subreddit (limit to avoid quota exhaustion)
+                const serperSearches = subreddits.slice(0, 2).map(async (subreddit) => {
+                    const serperResults = await searchRedditViaSerper(niche, subreddit);
+                    return serperResults.map(result => {
+                        const partialPost = serperResultToRedditPost(result);
+                        // Try to match with existing posts by URL
+                        const existingPost = posts.find(p => 
+                            p.permalink === partialPost.permalink || 
+                            p.permalink?.includes(partialPost.id || '')
+                        );
+                        
+                        if (existingPost) {
+                            // Merge snippet into existing post if it has more context
+                            if (result.snippet && result.snippet.length > existingPost.selftext.length) {
+                                existingPost.selftext = result.snippet;
+                            }
+                            return null; // Don't add duplicate
+                        }
+                        
+                        return partialPost;
+                    }).filter(Boolean);
+                });
+                
+                const serperPosts = (await Promise.all(serperSearches)).flat().filter(Boolean);
+                
+                // Add Serper posts to the collection
+                if (serperPosts.length > 0) {
+                    console.log(`[Serper] Added ${serperPosts.length} additional posts from Serper`);
+                    posts = removeDuplicates([...posts, ...serperPosts]);
+                }
+            } catch (error) {
+                console.error('[Serper] Error enriching with Serper data:', error);
+                // Continue without Serper data - not critical
+            }
+        } else {
+            if (!process.env.SERPER_DEV_API_KEY) {
+                console.log('[Serper] SERPER_DEV_API_KEY not configured. Skipping Serper enrichment.');
+            } else {
+                console.log(`[Serper] Rate limit exceeded. Remaining: ${serperRateLimit.remaining}. Skipping Serper enrichment.`);
+            }
+        }
 
         // 4. Quick filter
         const filtered = posts.filter(quickFilter);
@@ -212,12 +333,94 @@ export async function POST(request: NextRequest) {
             }))
             .sort((a, b) => b.goldScore - a.goldScore);
 
-        // 7.5. Apply plan-based limitations for free users
+        // 7.5. Fallback: If LLM filtered everything, use top scored posts
+        // Always ensure we have at least 1-3 results
         let filteredResults = rescored;
+        
+        if (filteredResults.length === 0 && scored.length > 0) {
+            console.warn(`[Fallback] LLM filtered all posts. Using top ${Math.min(3, scored.length)} posts by engagement score.`);
+            // Use top posts by engagement (score + comments) from different subreddits
+            const subredditGroups = new Map<string, typeof scored>();
+            scored.forEach(post => {
+                if (!subredditGroups.has(post.subreddit)) {
+                    subredditGroups.set(post.subreddit, []);
+                }
+                subredditGroups.get(post.subreddit)!.push(post);
+            });
+            
+            // Take top post from each subreddit, then fill with best overall
+            const topBySubreddit: typeof scored = [];
+            subredditGroups.forEach((posts, subreddit) => {
+                const top = posts.sort((a, b) => {
+                    const aEng = (a.score * 1.0) + (a.num_comments * 3.0);
+                    const bEng = (b.score * 1.0) + (b.num_comments * 3.0);
+                    return bEng - aEng;
+                })[0];
+                if (top) topBySubreddit.push(top);
+            });
+            
+            // Sort by engagement and take top 3
+            const topByEngagement = scored.sort((a, b) => {
+                const aEng = (a.score * 1.0) + (a.num_comments * 3.0);
+                const bEng = (b.score * 1.0) + (b.num_comments * 3.0);
+                return bEng - aEng;
+            });
+            
+            // Combine: prioritize diversity (different subreddits), then best engagement
+            const combined = [...topBySubreddit, ...topByEngagement];
+            const unique = combined.filter((post, index, self) => 
+                index === self.findIndex(p => p.id === post.id)
+            );
+            
+            filteredResults = unique.slice(0, 3).map(post => ({
+                ...post,
+                isOpportunity: true,
+                relevanceScore: 1.0, // Default relevance
+                goldScore: Math.round(calculateGoldScore(post, 1.0)),
+                postsCount: post.similarPostsCount || 1
+            }));
+            
+            console.log(`[Fallback] Selected ${filteredResults.length} posts from ${subredditGroups.size} subreddits`);
+        }
+
+        // 7.6. Apply plan-based limitations for free users
         if (userPlan === 'free') {
             // Free plan: only results with score < 80 (80 is the maximum)
-            filteredResults = rescored.filter(post => post.goldScore < 80);
-            console.log(`[Plan] Free plan: Filtered ${rescored.length} results to ${filteredResults.length} (score < 80)`);
+            const beforeFilter = filteredResults.length;
+            filteredResults = filteredResults.filter(post => post.goldScore < 80);
+            console.log(`[Plan] Free plan: Filtered ${beforeFilter} results to ${filteredResults.length} (score < 80)`);
+            
+            // If free plan filtered everything, still return at least 1 result
+            if (filteredResults.length === 0 && beforeFilter > 0) {
+                console.warn(`[Plan] Free plan filtered all results. Returning top result anyway.`);
+                const fallbackPost = rescored[0] || scored[0];
+                if (fallbackPost) {
+                    filteredResults = [{
+                        ...fallbackPost,
+                        goldScore: Math.min(79, fallbackPost.goldScore || 70) // Cap at 79 for free plan
+                    }];
+                }
+            }
+        }
+        
+        // 7.7. Ensure we always have at least 1 result (minimum viable response)
+        if (filteredResults.length === 0 && scored.length > 0) {
+            console.warn(`[Fallback] No results after all filters. Using top post by engagement.`);
+            const topPost = scored.sort((a, b) => {
+                const aEng = (a.score * 1.0) + (a.num_comments * 3.0);
+                const bEng = (b.score * 1.0) + (b.num_comments * 3.0);
+                return bEng - aEng;
+            })[0];
+            
+            if (topPost) {
+                filteredResults = [{
+                    ...topPost,
+                    isOpportunity: true,
+                    relevanceScore: 1.0,
+                    goldScore: Math.round(calculateGoldScore(topPost, 1.0)),
+                    postsCount: topPost.similarPostsCount || 1
+                }];
+            }
         }
 
         // 8. Generate blueprints (top 10 for premium, top 3 for free)

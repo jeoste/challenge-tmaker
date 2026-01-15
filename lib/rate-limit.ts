@@ -25,6 +25,53 @@ export const ratelimitFree = redis
     })
     : null;
 
+// Serper API rate limiters (separate from main rate limit)
+// Quota: 2500/month, so we limit to 3-5 requests per user
+export const serperRateLimitFree = redis
+    ? new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(3, '1 h'), // 3 Serper requests per hour for free plan
+        prefix: 'serper:', // Separate namespace
+    })
+    : null;
+
+export const serperRateLimitPremium = redis
+    ? new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(5, '1 h'), // 5 Serper requests per hour for premium
+        prefix: 'serper:', // Separate namespace
+    })
+    : null;
+
+// RapidAPI Reddit rate limiters (VERY strict - only 50 requests/month total)
+// Use global rate limiting to share quota across all users
+// Free: 1 request per user per day, Premium: 2 requests per user per day
+export const rapidApiRateLimitFree = redis
+    ? new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(1, '24 h'), // 1 request per day for free plan
+        prefix: 'rapidapi:', // Separate namespace
+    })
+    : null;
+
+export const rapidApiRateLimitPremium = redis
+    ? new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(2, '24 h'), // 2 requests per day for premium
+        prefix: 'rapidapi:', // Separate namespace
+    })
+    : null;
+
+// Global RapidAPI quota tracker (shared across all users)
+// This helps prevent exceeding the 50/month limit
+export const rapidApiGlobalQuota = redis
+    ? new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(50, '30 d'), // 50 requests per 30 days globally
+        prefix: 'rapidapi:global:', // Global namespace
+    })
+    : null;
+
 /**
  * Check if an IP address is whitelisted for testing
  * Supports both IPv4 and IPv6 addresses
@@ -116,6 +163,118 @@ export async function checkRateLimit(
             limit: expectedLimit,
             remaining: expectedLimit,
             reset: Date.now() + 3600000
+        };
+    }
+
+    const { success, limit, remaining, reset } = await ratelimit.limit(identifier);
+    return {
+        allowed: success,
+        limit,
+        remaining,
+        reset
+    };
+}
+
+/**
+ * Check Serper API rate limit (separate from main rate limit)
+ * Free: 3 requests/hour, Premium: 5 requests/hour
+ */
+export async function checkSerperRateLimit(
+    identifier: string,
+    isWhitelisted: boolean = false,
+    userPlan: 'free' | 'premium' = 'free'
+) {
+    // If IP is whitelisted, bypass rate limiting
+    if (isWhitelisted) {
+        return {
+            allowed: true,
+            limit: 999,
+            remaining: 999,
+            reset: Date.now() + 3600000
+        };
+    }
+
+    // Select the appropriate Serper rate limiter based on user plan
+    const ratelimit = userPlan === 'premium' ? serperRateLimitPremium : serperRateLimitFree;
+    const expectedLimit = userPlan === 'premium' ? 5 : 3;
+
+    // If rate limiting is not configured, allow all requests
+    if (!ratelimit) {
+        return {
+            allowed: true,
+            limit: expectedLimit,
+            remaining: expectedLimit,
+            reset: Date.now() + 3600000
+        };
+    }
+
+    const { success, limit, remaining, reset } = await ratelimit.limit(identifier);
+    return {
+        allowed: success,
+        limit,
+        remaining,
+        reset
+    };
+}
+
+/**
+ * Check RapidAPI Reddit rate limit (VERY strict - 50 requests/month total)
+ * Checks both per-user limit and global quota
+ * Free: 1 request/day, Premium: 2 requests/day
+ */
+export async function checkRapidApiRateLimit(
+    identifier: string,
+    isWhitelisted: boolean = false,
+    userPlan: 'free' | 'premium' = 'free'
+) {
+    // If IP is whitelisted, still check global quota
+    if (isWhitelisted) {
+        // Still check global quota even for whitelisted IPs
+        if (rapidApiGlobalQuota) {
+            const globalCheck = await rapidApiGlobalQuota.limit('quota');
+            if (!globalCheck.success) {
+                console.warn('[RapidAPI] Global quota (50/month) exceeded. Blocking request.');
+                return {
+                    allowed: false,
+                    limit: 50,
+                    remaining: globalCheck.remaining,
+                    reset: globalCheck.reset
+                };
+            }
+        }
+        return {
+            allowed: true,
+            limit: 999,
+            remaining: 999,
+            reset: Date.now() + 86400000 // 24 hours
+        };
+    }
+
+    // First check global quota (shared across all users)
+    if (rapidApiGlobalQuota) {
+        const globalCheck = await rapidApiGlobalQuota.limit('quota');
+        if (!globalCheck.success) {
+            console.warn('[RapidAPI] Global quota (50/month) exceeded. Blocking request.');
+            return {
+                allowed: false,
+                limit: 50,
+                remaining: globalCheck.remaining,
+                reset: globalCheck.reset
+            };
+        }
+    }
+
+    // Then check per-user limit
+    const ratelimit = userPlan === 'premium' ? rapidApiRateLimitPremium : rapidApiRateLimitFree;
+    const expectedLimit = userPlan === 'premium' ? 2 : 1;
+
+    // If rate limiting is not configured, still check global quota
+    if (!ratelimit) {
+        return {
+            allowed: true,
+            limit: expectedLimit,
+            remaining: expectedLimit,
+            reset: Date.now() + 86400000 // 24 hours
         };
     }
 

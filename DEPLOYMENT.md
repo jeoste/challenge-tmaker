@@ -42,6 +42,20 @@ Vercel se connecte directement à votre repository GitHub et déploie automatiqu
 ```env
 # Gemini (pour les blueprints IA)
 GEMINI_API_KEY=...
+# Alternative: GOOGLE_GENERATIVE_AI_API_KEY (priorité si les deux sont définis)
+
+# Serper API (optionnel - pour enrichir les données Reddit via Google)
+# Quota: 2500 requêtes/mois - Limité à 3-5 requêtes par utilisateur
+SERPER_DEV_API_KEY=...
+
+# RapidAPI Reddit (optionnel - pour enrichir les données Reddit)
+# Quota: 50 requêtes/mois - TRÈS LIMITÉ - Limité à 1-2 requêtes par utilisateur/jour
+# APIs utilisées:
+# - reddit3: Recherche de posts Reddit (prioritaire)
+# - reddit34: Métadonnées des subreddits (uniquement premium)
+# Free: 1 requête/jour (recherche uniquement)
+# Premium: 2 requêtes/jour (recherche + métadonnées)
+RAPID_API_KEY=...
 
 # Upstash Redis (cache + rate limiting)
 UPSTASH_REDIS_REST_URL=https://...
@@ -54,6 +68,11 @@ SUPABASE_SERVICE_ROLE_KEY=...
 
 # App URL
 NEXT_PUBLIC_APP_URL=https://unearth.vercel.app
+
+# Reddit User-Agent (optionnel - format recommandé: 'AppName/Version by Username')
+# Par défaut: 'Unearth/1.0 by unearth-app'
+# Important pour éviter les blocages Reddit - voir: https://www.reddit.com/r/redditdev/wiki/api
+REDDIT_USER_AGENT=Unearth/1.0 by unearth-app
 
 # IP Whitelist (optionnel - pour bypasser le rate limit lors des tests)
 # Format: IPv4 (ex: 192.168.1.1) ou IPv6 (ex: 2001:db8::1)

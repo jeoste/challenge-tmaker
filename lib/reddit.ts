@@ -1,6 +1,11 @@
 
 const REDDIT_BASE = 'https://www.reddit.com';
 
+// Reddit User-Agent format: 'AppName/Version by Username'
+// This is required to avoid rate limiting and blocks
+// See: https://www.reddit.com/r/redditdev/wiki/api
+const REDDIT_USER_AGENT = process.env.REDDIT_USER_AGENT || 'Unearth/1.0 by unearth-app';
+
 export interface RedditPost {
   id: string;
   title: string;
@@ -42,7 +47,7 @@ export async function fetchRedditPosts(
       
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'Unearth/1.0'
+          'User-Agent': REDDIT_USER_AGENT
         }
       });
       
@@ -94,7 +99,7 @@ export async function fetchRedditPosts(
       const url = `${REDDIT_BASE}/r/${subreddit}/${sort}.json?t=${timeFilter}&limit=100`;
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'Unearth/1.0'
+          'User-Agent': REDDIT_USER_AGENT
         }
       });
       
