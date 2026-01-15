@@ -85,7 +85,7 @@ export async function GET(
                         display: 'flex',
                     }}
                 >
-                    Analyzed by Reddit Goldmine AI
+                    Analyzed by Unearth AI
                 </div>
             </div>
         ),

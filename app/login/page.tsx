@@ -44,7 +44,7 @@ export default function LoginPage() {
               Connexion
             </h1>
             <p className="text-muted-foreground">
-              Accédez à Reddit Goldmine
+              Accédez à Unearth
             </p>
           </div>
 

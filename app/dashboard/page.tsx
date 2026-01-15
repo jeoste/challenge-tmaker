@@ -418,7 +418,7 @@ export default function DashboardPage() {
                       Bienvenue sur votre Dashboard
                     </h2>
                     <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-                      Commencez par analyser une niche pour débloquer tout le potentiel de Reddit Goldmine.
+                      Commencez par analyser une niche pour débloquer tout le potentiel d'Unearth.
                     </p>
                     <Link href="/">
                       <Button size="lg" className="flex items-center gap-2">

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Header } from "@/components/Header";
 import { SearchBar } from "@/components/SearchBar";
 import { NicheSuggestions } from "@/components/NicheSuggestions";
+import { RotatingWords } from "@/components/RotatingWords";
 
 export default function Home() {
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -22,7 +23,10 @@ export default function Home() {
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-semibold text-foreground mb-4 tracking-tight">
             Find hidden niches
             <br />
-            <span className="text-gradient">on Reddit</span>
+            <span className="text-gradient flex items-baseline justify-center gap-1">
+              <span>on</span>
+              <RotatingWords words={["Reddit", "Twitter", "Meta", "LinkedIn", "Discord"]} className="text-gradient" interval={2500} />
+            </span>
           </h1>
 
           {/* Subheadline */}

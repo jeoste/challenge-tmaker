@@ -41,7 +41,7 @@ export async function fetchRedditPosts(
       
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'RedditGoldmine/1.0'
+          'User-Agent': 'Unearth/1.0'
         }
       });
       
@@ -89,7 +89,7 @@ export async function fetchRedditPosts(
     const topUrl = `${REDDIT_BASE}/r/${subreddit}/top.json?t=${timeFilter}&limit=50`;
     const response = await fetch(topUrl, {
       headers: {
-        'User-Agent': 'RedditGoldmine/1.0'
+        'User-Agent': 'Unearth/1.0'
       }
     });
     

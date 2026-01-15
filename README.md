@@ -1,4 +1,4 @@
-# Reddit Goldmine
+# Unearth
 
 Mini-tool production-ready pour trouver des idées SaaS validées par Reddit en 10 secondes.
 

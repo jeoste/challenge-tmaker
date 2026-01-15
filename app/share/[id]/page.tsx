@@ -88,7 +88,7 @@ export default function SharePage() {
   const handleDownload = () => {
     const link = document.createElement('a');
     link.href = ogImageUrl;
-    link.download = `reddit-goldmine-${data.niche}-${selectedPain.goldScore}.png`;
+    link.download = `unearth-${data.niche}-${selectedPain.goldScore}.png`;
     link.click();
   };
 

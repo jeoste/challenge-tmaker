@@ -1,0 +1,39 @@
+---
+alwaysApply: false
+---
+# Design rules
+
+Component Ownership & Customization
+
+- Modify, Don't Just Use: Treat shadcn/ui not as a static library, but as a starting point for your own component library. When generating or updating components, directly modify the source code in the components/ui folder to establish a unique brand identity.
+- Global Style Overrides: Start by customizing globals.css. Adjust the default --radius (e.g., to 0.1rem for a sharper, modern look) and define custom color variables before building specific pages.
+
+The "Think Inside the Box" Layout Strategy
+
+- Parent-Child Hierarchy: View every layout as a "top-down family tree" of boxes.
+- Flexbox for Flexibility: Use Flexbox as the default for most layouts to allow children freedom in size and location. Use justify-content: space-between to distribute space evenly in responsive headers.
+- Grid for Rigidity: Reserve CSS Grid for structured, multi-column layouts where you need precise control over rows and columns (e.g., card galleries).
+
+Typography & Visual Hierarchy
+
+- Mathematical Scaling: Use a Type Scale system (like the Major Third) rather than "eyeballing" font sizes. Pick a base size (14px or 16px) and increment in 2-pixel steps.
+- Inversed Line Height: Apply a line height of roughly 150% for body text to allow it to "breathe". For large headings, tighten the line height (closer to 100%) to make them feel impactful.
+- De-emphasis Technique: Instead of bolding everything, create focus by de-emphasising secondary text. Keep headings at 100% lightness and drop secondary text to roughly 60% lightness (using HSL/OKLCH) to make the title "stand alone".
+
+Color Systems (HSL & OKLCH)
+
+- Avoid Hex Codes: Always use HSL or OKLCH color formats for intuitiveness and better math. OKLCH is preferred for more natural-looking color increments.
+- Layering for Depth: Create a neutral palette by manipulating the Lightness (L) value. Lighter elements should appear "on top" and feel closer to the user. Subtract lightness values from 100 to quickly convert dark mode themes to light mode.
+
+Optical Depth & Light Simulation
+
+- Simulated Light Source: Treat the UI as if light is hitting it from the top.
+- Layered Shadows: Avoid single, basic shadows. Combine a small, sharp shadow (the glow) with a larger, softer shadow (the depth) for a realistic, physical feel.
+- Borders as Highlights: Use a 1px top border (a "highlight") that is lighter than the element's background to simulate an elevated edge.
+
+Physics-Based Motion & Micro-interactions
+
+- Organic Timing: Never use ease-linear. Use custom cubic-bezier curves to make movements feel natural—starting slow, speeding up, and swinging slightly past the finish line before settling (momentum).
+- The "Ghost Element" Nav: For navigation menus, use a "ghost" background element that slides and morphs its width and height to fit the hovered link, creating a "liquid magnet" effect.
+- Interactive Feedback: Use the Web Animations API or element.animate for dynamic interactions, such as "flying" a cloned product image into a cart icon to provide instant visual confirmation.
+- SVG Tracing: For icons and logos, animate the stroke-dashoffset to make the lines appears to draw themselves in real-time.

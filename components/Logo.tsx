@@ -2,21 +2,22 @@ import Image from "next/image";
 
 export const Logo = () => {
   return (
-    <div className="flex items-center gap-2">
-      <div className="relative">
-        <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
-        <div className="relative p-2 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20">
-          <Image
-            src="/icon.png"
-            alt="Reddit Goldmine Logo"
-            width={20}
-            height={20}
-            className="w-5 h-5"
-          />
-        </div>
-      </div>
-      <span className="font-semibold text-lg text-foreground">
-        Reddit<span className="text-primary">Goldmine</span>
+    <div className="flex items-center gap-3">
+      <Image
+        src="/icon.png"
+        alt="Unearth Logo"
+        width={32}
+        height={32}
+        className="w-8 h-8"
+      />
+      <span 
+        className="text-xl font-bold text-foreground tracking-tight"
+        style={{
+          fontFamily: "'Space Grotesk', sans-serif",
+          letterSpacing: '-0.02em',
+        }}
+      >
+        UNEARTH
       </span>
     </div>
   );

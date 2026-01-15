@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Reddit Goldmine - Trouve des Idées SaaS Validées par Reddit",
+  title: "Unearth - Trouve des Idées SaaS Validées par Reddit",
   description:
     "Scanne automatiquement les pain points Reddit et génère des blueprints de micro-SaaS prêts à lancer",
   icons: {

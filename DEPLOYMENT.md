@@ -1,4 +1,4 @@
-# Guide de Déploiement - Reddit Goldmine
+# Guide de Déploiement - Unearth
 
 ## Déploiement sur Vercel
 
@@ -53,7 +53,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
 
 # App URL
-NEXT_PUBLIC_APP_URL=https://reddit-goldmine.vercel.app
+NEXT_PUBLIC_APP_URL=https://unearth.vercel.app
 
 # IP Whitelist (optionnel - pour bypasser le rate limit lors des tests)
 # Format: IPv4 (ex: 192.168.1.1) ou IPv6 (ex: 2001:db8::1)
