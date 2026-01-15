@@ -40,10 +40,11 @@ export async function middleware(request: NextRequest) {
   const isAuthPage =
     request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/signup');
-  // Only /share requires authentication (to access saved analyses)
+  // /share and /dashboard require authentication
   // /results is public (no account required per PRD)
   const isProtectedPage =
-    request.nextUrl.pathname.startsWith('/share');
+    request.nextUrl.pathname.startsWith('/share') ||
+    request.nextUrl.pathname.startsWith('/dashboard');
 
   if (isProtectedPage && !session) {
     const redirectUrl = new URL('/login', request.url);
@@ -59,5 +60,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/results/:path*', '/share/:path*', '/login', '/signup'],
+  matcher: ['/results/:path*', '/share/:path*', '/dashboard/:path*', '/login', '/signup'],
 };

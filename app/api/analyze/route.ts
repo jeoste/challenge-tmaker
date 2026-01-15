@@ -22,10 +22,16 @@ export async function POST(request: NextRequest) {
     const startTime = Date.now();
     
     try {
-        // Authentication is optional (per PRD: "100% gratuit • Pas de compte requis")
-        // If authenticated, use user_id; otherwise use IP for rate limiting
+        // Authentication is required
         const session = await getServerSession();
-        const userId = session?.user?.id || null;
+        if (!session || !session.user) {
+            return NextResponse.json(
+                { error: 'Authentication required. Please log in to perform an analysis.' },
+                { status: 401 }
+            );
+        }
+        
+        const userId = session.user.id;
         const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
                    request.headers.get('x-real-ip') || 
                    'anonymous';
@@ -36,16 +42,16 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Niche is required' }, { status: 400 });
         }
 
-        // 1. Rate limiting (using user_id if authenticated, otherwise IP)
+        // 1. Rate limiting (using user_id since authentication is required)
         // Check if IP is whitelisted for testing
         const ipWhitelisted = isIPWhitelisted(ip);
         
-        // Use a prefix for authenticated users to separate their limit from IP-based limit
-        const rateLimitIdentifier = userId ? `user:${userId}` : `ip:${ip}`;
+        // Use user_id for rate limiting
+        const rateLimitIdentifier = `user:${userId}`;
         const rateLimit = await checkRateLimit(rateLimitIdentifier, ipWhitelisted);
         if (!rateLimit.allowed) {
             // Log for debugging
-            console.log(`Rate limit exceeded for ${userId ? `user:${userId}` : `ip:${ip}`}, remaining: ${rateLimit.remaining}, reset: ${new Date(rateLimit.reset).toISOString()}`);
+            console.log(`Rate limit exceeded for user:${userId}, remaining: ${rateLimit.remaining}, reset: ${new Date(rateLimit.reset).toISOString()}`);
             return NextResponse.json(
                 { 
                     error: 'Rate limit exceeded. Max 5 scans per hour.',
@@ -198,31 +204,28 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // 10. Save to Supabase (only if authenticated)
+        // 10. Save to Supabase
         let analysisData = null;
-        if (userId) {
-            const { data, error: analysisError } = await supabaseAdmin
-                .from('reddit_analyses')
-                .insert({
-                    user_id: userId,
-                    niche,
-                    scanned_at: new Date().toISOString(),
-                    total_posts: posts.length,
-                    pains: pains
-                })
-                .select()
-                .single();
+        const { data, error: analysisError } = await supabaseAdmin
+            .from('reddit_analyses')
+            .insert({
+                user_id: userId,
+                niche,
+                scanned_at: new Date().toISOString(),
+                total_posts: posts.length,
+                pains: pains
+            })
+            .select()
+            .single();
 
-            if (analysisError) {
-                console.error('Error saving to Supabase:', analysisError);
-                // Continue even if Supabase save fails
-            } else {
-                analysisData = data;
-            }
+        if (analysisError) {
+            console.error('Error saving to Supabase:', analysisError);
+            // Continue even if Supabase save fails
+        } else {
+            analysisData = data;
         }
 
-        // 11. Log metrics (only if table exists and user is authenticated)
-        if (userId) {
+        // 11. Log metrics (only if table exists)
             const duration = Date.now() - startTime;
             await supabaseAdmin
                 .from('scan_logs')

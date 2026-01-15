@@ -8,7 +8,7 @@ import { PainPointCard } from '@/components/results/PainPointCard';
 import { Button } from '@/components/ui/button';
 import { AnalyzeResponse } from '@/types';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, RefreshCw, AlertCircle } from 'lucide-react';
+import { ArrowLeft, RefreshCw, AlertCircle, LayoutDashboard } from 'lucide-react';
 
 export default function ResultsPage() {
   const params = useParams();
@@ -92,6 +92,13 @@ export default function ResultsPage() {
 
         const result = await response.json();
         setData(result);
+        
+        // Log if analysis was saved (has id)
+        if (result.id) {
+          console.log('Analysis saved with ID:', result.id);
+        } else {
+          console.log('Analysis not saved (user not authenticated or save failed)');
+        }
       } catch (err: any) {
         console.error('Error fetching results:', err);
         setError('Erreur de connexion');
@@ -279,14 +286,30 @@ export default function ResultsPage() {
             <p className="text-muted-foreground mb-4">
               Vous voulez analyser une autre niche ?
             </p>
-            <Button
-              variant="outline"
-              onClick={() => router.push('/')}
-              className="flex items-center gap-2 mx-auto"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Nouvelle Recherche
-            </Button>
+            <div className="flex gap-3 justify-center">
+              <Button
+                variant="outline"
+                onClick={() => router.push('/')}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Nouvelle Recherche
+              </Button>
+              {data.id && (
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/dashboard')}
+                  className="flex items-center gap-2"
+                >
+                  Voir dans Dashboard
+                </Button>
+              )}
+            </div>
+            {!data.id && (
+              <p className="text-xs text-muted-foreground mt-4">
+                💡 Connectez-vous pour sauvegarder cette analyse dans votre dashboard
+              </p>
+            )}
           </div>
         </div>
       </div>

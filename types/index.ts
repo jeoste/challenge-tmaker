@@ -18,6 +18,9 @@ export interface Blueprint {
   mrrEstimate: string;
   techStack: string;
   difficulty?: number; // 1-5, optional (can be calculated if not provided)
+  keyFeatures?: string[]; // Optional: key features of the solution
+  targetAudience?: string; // Optional: target audience description
+  pricingModel?: string; // Optional: suggested pricing model
 }
 
 export interface PainPoint {

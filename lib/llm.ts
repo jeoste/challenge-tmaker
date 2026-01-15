@@ -5,12 +5,13 @@ import { RedditPost } from './reddit';
 import { calculateGoldScore } from './scoring';
 
 // Get Gemini API key from environment
-const getGeminiModel = () => {
+const getGeminiModel = (usePro: boolean = false) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         throw new Error('GEMINI_API_KEY environment variable is not set');
     }
-    return google('gemini-1.5-flash', { apiKey });
+    // Use Pro for better quality analysis and blueprint generation
+    return google(usePro ? 'gemini-1.5-pro' : 'gemini-1.5-flash', { apiKey });
 };
 
 export interface LLMAnalysis {
@@ -22,29 +23,44 @@ export interface LLMAnalysis {
 export async function batchLLMAnalysis(
     posts: RedditPost[]
 ): Promise<Array<RedditPost & { isOpportunity: boolean; relevanceScore: number }>> {
-    const postsList = posts.map((p, i) => `${i}. "${p.title}" - ${p.selftext.substring(0, 200)}`).join('\n');
-    const prompt = `Analyse ces posts Reddit et identifie ceux qui sont de VRAIES opportunités business (pas juste des plaintes).
+    const postsList = posts.map((p, i) => `${i}. "${p.title}"\n   Contexte: ${p.selftext.substring(0, 300)}`).join('\n\n');
+    const prompt = `Tu es un expert en identification d'opportunités SaaS. Analyse ces posts Reddit et identifie UNIQUEMENT ceux qui représentent de VRAIES opportunités business monétisables.
 
-Pour chaque post, évalue sa monétisabilité avec un relevanceScore entre 0.5 et 1.5:
-- 1.5 = Problème très monétisable, demande claire et urgente
+CRITÈRES STRICTS pour une opportunité valide :
+✅ L'utilisateur exprime un BESOIN ou un PROBLÈME récurrent
+✅ Le problème peut être résolu par un produit/service SaaS
+✅ Il y a une DEMANDE claire (pas juste une discussion ou une plainte)
+✅ Le problème n'est PAS déjà résolu par des solutions majeures existantes
+✅ Il y a un POTENTIEL de marché (plusieurs personnes ont le même problème)
+
+❌ REJETER si :
+- C'est juste une discussion ou un partage d'expérience
+- C'est un conseil ou une explication technique
+- Le problème est déjà résolu par des solutions bien établies
+- C'est une plainte sans demande de solution
+- Pas de potentiel business clair
+
+Pour chaque post, évalue avec un relevanceScore entre 0.5 et 1.5:
+- 1.5 = Problème très monétisable, demande claire et urgente, marché validé
+- 1.2 = Problème monétisable avec demande claire
 - 1.0 = Problème valide mais générique ou déjà partiellement résolu
-- 0.5 = Problème peu monétisable ou déjà résolu par des solutions existantes
+- 0.5 = Pas une opportunité business (rejeter)
 
 Posts:
 ${postsList}
 
-Réponds en JSON:
+Réponds en JSON strict (uniquement le tableau, pas de texte avant/après):
 [
-  {"index": 0, "isOpportunity": true, "relevanceScore": 1.5, "intensity": "high"},
-  {"index": 1, "isOpportunity": false, "relevanceScore": 0.5, "reason": "..."},
+  {"index": 0, "isOpportunity": true, "relevanceScore": 1.5, "intensity": "high", "reason": "Demande claire pour un outil SaaS"},
+  {"index": 1, "isOpportunity": false, "relevanceScore": 0.5, "reason": "Discussion technique, pas de demande business"},
   ...
 ]`;
 
     try {
         const { text } = await generateText({
-            model: getGeminiModel(),
+            model: getGeminiModel(true), // Use Pro for better filtering
             prompt,
-            temperature: 0.3,
+            temperature: 0.2, // Lower temperature for more consistent filtering
         });
 
         // Clean up JSON string - remove markdown code blocks and whitespace
@@ -89,36 +105,42 @@ Réponds en JSON:
 }
 
 export async function generateBlueprint(post: RedditPost) {
-    const prompt = `Tu es un expert en micro-SaaS. Transforme ce pain point Reddit en blueprint actionnable.
+    const prompt = `Tu es un expert en micro-SaaS et entrepreneur. Transforme ce pain point Reddit en blueprint actionnable et détaillé.
 
 PAIN POINT: "${post.title}"
-CONTEXTE: "${post.selftext.substring(0, 500)}"
+CONTEXTE COMPLET: "${post.selftext.substring(0, 800)}"
 SCORE: ${calculateGoldScore(post)}/100
+SUBREDDIT: r/${post.subreddit}
 
-Génère un JSON avec:
+Analyse en profondeur et génère un JSON détaillé avec:
 {
-  "problem": "1 ligne claire du problème",
-  "solutionName": "Nom du SaaS suggéré (créatif, mémorable)",
-  "solutionPitch": "2-3 lignes expliquant la solution",
+  "problem": "Description claire et concise du problème (1-2 phrases)",
+  "solutionName": "Nom créatif et mémorable du SaaS (ex: 'ResumeTracker', 'APIKeyGuard')",
+  "solutionPitch": "Description détaillée de la solution (3-4 lignes). Explique COMMENT le SaaS résout le problème, les fonctionnalités clés, et la valeur apportée.",
   "marketSize": "Small|Medium|Large",
-  "firstChannel": "Premier canal d'acquisition (ex: Product Hunt, Reddit ads)",
-  "mrrEstimate": "Estimation MRR (ex: $2k-$5k)",
-  "techStack": "Stack suggérée (ex: Next.js + Supabase)",
-  "difficulty": 3
+  "firstChannel": "Canal d'acquisition spécifique et actionnable (ex: 'Reddit ads sur r/recruitinghell', 'Post sur Product Hunt', 'Partnership avec r/webdev')",
+  "mrrEstimate": "Estimation réaliste basée sur le marché (ex: '$1k-$3k MRR', '$5k-$10k MRR')",
+  "techStack": "Stack technique concrète et réaliste (ex: 'Next.js 15 + Supabase + Stripe + Resend', 'React + Firebase + OpenAI API')",
+  "difficulty": 3,
+  "keyFeatures": ["Feature 1", "Feature 2", "Feature 3"],
+  "targetAudience": "Description de la cible (ex: 'Développeurs qui utilisent plusieurs APIs', 'Recruteurs tech')",
+  "pricingModel": "Modèle de pricing suggéré (ex: 'Freemium avec $9/mois premium', 'One-time $49')"
 }
 
-difficulty: Un nombre entre 1 et 5 indiquant la difficulté de mise en œuvre:
-- 1-2 = Facile (marché large, stack simple)
-- 3 = Moyen (marché moyen, stack standard)
-- 4-5 = Difficile (marché niche, stack complexe)
+IMPORTANT:
+- solutionPitch doit être DÉTAILLÉ et ACTIONNABLE, pas générique
+- keyFeatures doit lister 3-5 fonctionnalités concrètes
+- targetAudience doit être spécifique
+- pricingModel doit être réaliste pour le marché
+- difficulty: 1-2 = Facile, 3 = Moyen, 4-5 = Difficile
 
 Réponds UNIQUEMENT en JSON valide, pas de markdown, pas de texte avant ou après.`;
 
     try {
         const { text } = await generateText({
-            model: getGeminiModel(),
+            model: getGeminiModel(true), // Use Pro for better blueprint generation
             prompt,
-            temperature: 0.7,
+            temperature: 0.6, // Balanced creativity and consistency
         });
 
         // Clean up JSON string - remove markdown code blocks and whitespace
@@ -148,7 +170,11 @@ Réponds UNIQUEMENT en JSON valide, pas de markdown, pas de texte avant ou aprè
             techStack: blueprint.techStack || 'Next.js + Supabase',
             difficulty: typeof blueprint.difficulty === 'number' 
                 ? Math.max(1, Math.min(5, Math.round(blueprint.difficulty)))
-                : undefined // Will be calculated in PainPointCard if not provided
+                : undefined, // Will be calculated in PainPointCard if not provided
+            // Optional new fields
+            keyFeatures: Array.isArray(blueprint.keyFeatures) ? blueprint.keyFeatures : undefined,
+            targetAudience: blueprint.targetAudience || undefined,
+            pricingModel: blueprint.pricingModel || undefined
         };
     } catch (error) {
         console.error('Blueprint generation error:', error);

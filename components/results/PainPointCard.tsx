@@ -116,9 +116,44 @@ export function PainPointCard({
         <h3 className="text-xl font-bold text-foreground mb-2">
           {painPoint.title}
         </h3>
-        <p className="text-base italic text-muted-foreground line-clamp-2">
+        <p className="text-base text-foreground mb-2">
+          💡 <span className="font-semibold">{painPoint.blueprint.solutionName}</span>
+        </p>
+        <p className="text-base text-muted-foreground mb-3 leading-relaxed">
           {painPoint.blueprint.solutionPitch}
         </p>
+        
+        {/* Key Features if available */}
+        {painPoint.blueprint.keyFeatures && painPoint.blueprint.keyFeatures.length > 0 && (
+          <div className="mb-3">
+            <p className="text-xs font-medium text-muted-foreground mb-1.5">Fonctionnalités clés :</p>
+            <div className="flex flex-wrap gap-1.5">
+              {painPoint.blueprint.keyFeatures.slice(0, 3).map((feature, idx) => (
+                <span
+                  key={idx}
+                  className="text-xs px-2 py-0.5 rounded bg-secondary/50 border border-border text-muted-foreground"
+                >
+                  {feature}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Target Audience if available */}
+        {painPoint.blueprint.targetAudience && (
+          <p className="text-xs text-muted-foreground mb-2">
+            🎯 Cible: {painPoint.blueprint.targetAudience}
+          </p>
+        )}
+        
+        {/* Pricing Model if available */}
+        {painPoint.blueprint.pricingModel && (
+          <p className="text-xs text-muted-foreground mb-2">
+            💰 Pricing: {painPoint.blueprint.pricingModel}
+          </p>
+        )}
+        
         <p className="text-sm text-muted-foreground mt-2">
           📊 {painPoint.postsCount} post{painPoint.postsCount > 1 ? 's' : ''} similaire{painPoint.postsCount > 1 ? 's' : ''} cette semaine
         </p>

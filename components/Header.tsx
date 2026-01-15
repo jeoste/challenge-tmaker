@@ -33,12 +33,26 @@ export const Header = () => {
             <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               Pricing
             </Link>
+            {user && (
+              <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                Dashboard
+              </Link>
+            )}
           </nav>
           <div className="flex items-center gap-4">
             {!loading && (
               <>
                 {user ? (
                   <>
+                    <Link href="/dashboard">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="hidden sm:inline-flex"
+                      >
+                        Dashboard
+                      </Button>
+                    </Link>
                     <span className="text-sm text-muted-foreground hidden sm:inline">
                       {user.email}
                     </span>

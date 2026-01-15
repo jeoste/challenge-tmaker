@@ -1,8 +1,10 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/components/auth/AuthProvider';
+import Link from 'next/link';
 
 interface ResultsHeaderProps {
   niche: string;
@@ -10,6 +12,7 @@ interface ResultsHeaderProps {
 
 export function ResultsHeader({ niche }: ResultsHeaderProps) {
   const router = useRouter();
+  const { user } = useAuth();
 
   return (
     <div className="flex items-center justify-between mb-8">
@@ -31,6 +34,18 @@ export function ResultsHeader({ niche }: ResultsHeaderProps) {
           </p>
         </div>
       </div>
+      {user && (
+        <Link href="/dashboard">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            Dashboard
+          </Button>
+        </Link>
+      )}
     </div>
   );
 }
