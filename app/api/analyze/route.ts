@@ -259,7 +259,7 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // 10. Save to Supabase
+        // 10. Save to Supabase (optional - don't fail if table doesn't exist)
         let analysisData = null;
         const { data, error: analysisError } = await supabaseAdmin
             .from('reddit_analyses')
@@ -274,17 +274,32 @@ export async function POST(request: NextRequest) {
             .single();
 
         if (analysisError) {
-            console.error('CRITICAL: Error saving to Supabase:', analysisError);
-            console.error('Payload was:', {
-                niche,
-                scanned_at: new Date().toISOString(),
-                total_posts: posts.length,
-                pains_count: pains.length
-            });
-            throw new Error(`Failed to save analysis: ${analysisError.message}`);
+            // If table doesn't exist (PGRST205), log but don't fail
+            // This allows the app to work even if migrations haven't been run
+            if (analysisError.code === 'PGRST205' || analysisError.message?.includes('not found')) {
+                console.warn('Warning: reddit_analyses table not found. Skipping database save. Run migrations to enable persistence.');
+                console.warn('Error details:', {
+                    code: analysisError.code,
+                    message: analysisError.message,
+                    niche,
+                    total_posts: posts.length,
+                    pains_count: pains.length
+                });
+            } else {
+                // For other errors, log but continue - don't fail the entire request
+                console.error('Error saving to Supabase (non-critical):', analysisError);
+                console.error('Payload was:', {
+                    niche,
+                    scanned_at: new Date().toISOString(),
+                    total_posts: posts.length,
+                    pains_count: pains.length
+                });
+            }
+            // Continue without saving to database
+            analysisData = null;
+        } else {
+            analysisData = data;
         }
-
-        analysisData = data;
 
         // 11. Log metrics (only if table exists)
         const duration = Date.now() - startTime;

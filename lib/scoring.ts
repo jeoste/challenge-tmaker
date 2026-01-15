@@ -91,13 +91,18 @@ export function calculateGoldScore(post: RedditPost, llmRelevance?: number): num
     // Check for low-value patterns (indicates non-business content)
     const hasLowValuePattern = LOW_VALUE_PATTERNS.some(pattern => pattern.test(text));
     
-    // Calculate engagement score
-    const engagement = (post.score * 1.5) + (post.num_comments * 2.5);
+    // Calculate engagement score - prioritize viral posts (high score + high comments)
+    // Comments are more valuable than upvotes for business opportunities (indicates discussion/need)
+    const engagement = (post.score * 1.0) + (post.num_comments * 3.0);
+    
+    // Bonus for highly viral posts (100+ upvotes or 50+ comments)
+    const viralBonus = (post.score > 100 || post.num_comments > 50) ? 1.5 : 1.0;
+    
     const ageInHours = (Date.now() / 1000 - post.created_utc) / 3600;
     const recency = Math.max(1, 168 - ageInHours); // Bonus if < 7 days
 
-    // Base score
-    let score = (engagement * recency) / 10;
+    // Base score with viral bonus
+    let score = (engagement * recency * viralBonus) / 10;
 
     // Apply pattern-based multipliers
     if (hasHighValuePattern) {

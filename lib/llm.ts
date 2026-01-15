@@ -5,10 +5,16 @@ import { RedditPost } from './reddit';
 import { calculateGoldScore } from './scoring';
 
 // Get Gemini API key from environment
+// The @ai-sdk/google package looks for GOOGLE_GENERATIVE_AI_API_KEY by default
+// but we also support GEMINI_API_KEY for backward compatibility
 const getGeminiModel = (usePro: boolean = false) => {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY;
     if (!apiKey) {
-        throw new Error('GEMINI_API_KEY environment variable is not set');
+        // Don't throw, return a model that will fail gracefully
+        // This allows the app to continue even if API key is missing
+        console.warn('Warning: GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY not set. LLM features will not work.');
+        // Return model with empty key - it will fail at call time but won't crash the app startup
+        return google(usePro ? 'gemini-1.5-pro' : 'gemini-1.5-flash', { apiKey: '' });
     }
     // Use Pro for better quality analysis and blueprint generation
     return google(usePro ? 'gemini-1.5-pro' : 'gemini-1.5-flash', { apiKey });
@@ -23,39 +29,55 @@ export interface LLMAnalysis {
 export async function batchLLMAnalysis(
     posts: RedditPost[]
 ): Promise<Array<RedditPost & { isOpportunity: boolean; relevanceScore: number }>> {
-    const postsList = posts.map((p, i) => `${i}. "${p.title}"\n   Contexte: ${p.selftext.substring(0, 300)}`).join('\n\n');
-    const prompt = `Tu es un expert en identification d'opportunités SaaS. Analyse ces posts Reddit et identifie UNIQUEMENT ceux qui représentent de VRAIES opportunités business monétisables.
+    // Include engagement metrics in the prompt to help prioritize viral posts
+    const postsList = posts.map((p, i) => 
+        `${i}. "${p.title}" (${p.score} upvotes, ${p.num_comments} comments, r/${p.subreddit})\n   Contexte: ${p.selftext.substring(0, 300)}`
+    ).join('\n\n');
+    
+    const prompt = `Tu es un expert en identification d'opportunités SaaS. Analyse ces posts Reddit et identifie ceux qui représentent des opportunités business monétisables.
 
-CRITÈRES STRICTS pour une opportunité valide :
-✅ L'utilisateur exprime un BESOIN ou un PROBLÈME récurrent qui peut être résolu par un SaaS
-✅ Il y a une DEMANDE claire pour un outil/solution (ex: "looking for", "need a tool", "best alternative to")
-✅ Le problème n'est PAS déjà résolu par des solutions majeures existantes
-✅ Il y a un POTENTIEL de marché (plusieurs personnes ont le même problème)
-✅ Le post cherche activement une solution, pas juste une discussion
+IMPORTANT - PRIORISATION :
+1. PRIORISE les posts VIRAUX avec beaucoup de likes (score élevé) et commentaires (engagement élevé)
+2. PRIORISE les posts qui génèrent de la DISCUSSION (beaucoup de commentaires = besoin validé)
+3. DIVERSIFIE les résultats entre différents subreddits (ne pas tout prendre d'un seul subreddit)
+4. Tu DOIS identifier AU MOINS 3 opportunités valides parmi ces posts
 
-❌ REJETER ABSOLUMENT si :
-- C'est un avertissement de sécurité ou un conseil (ex: "Stop pasting API keys", "Don't do X")
-- C'est un tutoriel, guide ou explication technique
-- C'est un partage d'expérience sans demande de solution
-- C'est une annonce de projet/lancement ("I just built...", "Check out my...")
-- C'est une discussion métier sans demande concrète
-- C'est une plainte sans demande de solution
-- Le problème est déjà bien résolu par des solutions établies
-- Pas de potentiel business monétisable clair
+CRITÈRES pour une opportunité valide :
+✅ L'utilisateur exprime un BESOIN ou un PROBLÈME qui peut être résolu par un SaaS
+✅ Il y a une DEMANDE pour un outil/solution (ex: "looking for", "need a tool", "best alternative to", "wish there was")
+✅ Le post génère de l'ENGAGEMENT (likes/comments = validation du besoin)
+✅ Il y a un POTENTIEL de marché (même si le problème est partiellement résolu)
+✅ Le post exprime une FRUSTRATION ou un BESOIN récurrent
 
-Pour chaque post, évalue avec un relevanceScore entre 0.5 et 1.5:
-- 1.5 = Problème très monétisable, demande claire et urgente, marché validé
-- 1.2 = Problème monétisable avec demande claire
-- 1.0 = Problème valide mais générique ou déjà partiellement résolu
-- 0.5 = Pas une opportunité business (rejeter)
+ACCEPTE aussi :
+- Posts avec beaucoup d'engagement même si la demande n'est pas explicite (les commentaires peuvent révéler le besoin)
+- Posts qui comparent des solutions existantes (besoin d'alternative)
+- Posts qui décrivent un problème récurrent (opportunité de SaaS)
+- Posts avec des plaintes légitimes sur des outils existants (opportunité d'amélioration)
+
+❌ REJETER SEULEMENT si :
+- C'est clairement un avertissement de sécurité sans contexte business
+- C'est uniquement un tutoriel technique sans demande
+- C'est une annonce de projet/lancement sans contexte de besoin
+- Le post a 0 engagement (pas de likes ni commentaires)
+
+Pour chaque post, évalue avec un relevanceScore entre 0.7 et 1.5:
+- 1.5 = Post viral (100+ upvotes ou 50+ comments) avec demande claire de solution SaaS
+- 1.3 = Post avec bon engagement (20+ upvotes ou 10+ comments) et besoin identifié
+- 1.1 = Post avec engagement modéré et problème valide
+- 0.9 = Post avec peu d'engagement mais problème intéressant
+- 0.7 = Post marginal mais avec potentiel
+- 0.5 = Pas une opportunité (rejeter seulement si vraiment pas pertinent)
+
+IMPORTANT : Tu DOIS identifier au moins 3 opportunités. Si tu ne trouves pas 3 posts évidents, choisis les 3 meilleurs même s'ils ne sont pas parfaits.
 
 Posts:
 ${postsList}
 
 Réponds en JSON strict (uniquement le tableau, pas de texte avant/après):
 [
-  {"index": 0, "isOpportunity": true, "relevanceScore": 1.5, "intensity": "high", "reason": "Demande claire pour un outil SaaS"},
-  {"index": 1, "isOpportunity": false, "relevanceScore": 0.5, "reason": "Discussion technique, pas de demande business"},
+  {"index": 0, "isOpportunity": true, "relevanceScore": 1.5, "intensity": "high", "reason": "Post viral avec demande claire"},
+  {"index": 1, "isOpportunity": true, "relevanceScore": 1.2, "reason": "Bon engagement et besoin identifié"},
   ...
 ]`;
 
@@ -100,8 +122,14 @@ Réponds en JSON strict (uniquement le tableau, pas de texte avant/après):
                 };
             })
             .filter(p => p.isOpportunity);
-    } catch (error) {
-        console.error('LLM batch analysis error:', error);
+    } catch (error: any) {
+        // Check if it's an API key error
+        if (error?.message?.includes('API key') || error?.message?.includes('LoadAPIKeyError')) {
+            console.warn('LLM API key missing or invalid. Using fallback: all posts will be marked as opportunities.');
+            console.warn('To enable LLM filtering, set GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY environment variable.');
+        } else {
+            console.error('LLM batch analysis error:', error);
+        }
         // Fallback: return all posts if LLM fails, don't block the app
         return posts.map(p => ({ ...p, isOpportunity: true, relevanceScore: 1.0 }));
     }
@@ -179,8 +207,14 @@ Réponds UNIQUEMENT en JSON valide, pas de markdown, pas de texte avant ou aprè
             targetAudience: blueprint.targetAudience || undefined,
             pricingModel: blueprint.pricingModel || undefined
         };
-    } catch (error) {
-        console.error('Blueprint generation error:', error);
+    } catch (error: any) {
+        // Check if it's an API key error
+        if (error?.message?.includes('API key') || error?.message?.includes('LoadAPIKeyError')) {
+            console.warn('LLM API key missing or invalid. Using fallback blueprint.');
+            console.warn('To enable LLM blueprint generation, set GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY environment variable.');
+        } else {
+            console.error('Blueprint generation error:', error);
+        }
         // Return fallback blueprint
         return {
             problem: post.title,
