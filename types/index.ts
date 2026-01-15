@@ -11,8 +11,10 @@ export interface RedditPost {
 
 export interface Blueprint {
   problem: string;
+  whyPainPoint?: string; // Why this is a validated pain point
   solutionName: string;
   solutionPitch: string;
+  howItSolves?: string; // How the solution specifically solves the problem
   marketSize: 'Small' | 'Medium' | 'Large';
   firstChannel: string;
   mrrEstimate: string;
@@ -21,6 +23,18 @@ export interface Blueprint {
   keyFeatures?: string[]; // Optional: key features of the solution
   targetAudience?: string; // Optional: target audience description
   pricingModel?: string; // Optional: suggested pricing model
+  roadmap?: {
+    phase1: {
+      name: string;
+      features: string[];
+      timeline: string;
+    };
+    phase2?: {
+      name: string;
+      features: string[];
+      timeline: string;
+    };
+  };
 }
 
 export interface PainPoint {

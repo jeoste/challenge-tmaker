@@ -41,8 +41,11 @@ Vercel se connecte directement à votre repository GitHub et déploie automatiqu
 
 ```env
 # Gemini (pour les blueprints IA)
+# IMPORTANT: @ai-sdk/google lit GOOGLE_GENERATIVE_AI_API_KEY par défaut
+# Le code supporte aussi GEMINI_API_KEY et le convertit automatiquement
+GOOGLE_GENERATIVE_AI_API_KEY=...
+# OU (sera automatiquement converti en GOOGLE_GENERATIVE_AI_API_KEY)
 GEMINI_API_KEY=...
-# Alternative: GOOGLE_GENERATIVE_AI_API_KEY (priorité si les deux sont définis)
 
 # Serper API (optionnel - pour enrichir les données Reddit via Google)
 # Quota: 2500 requêtes/mois - Limité à 3-5 requêtes par utilisateur

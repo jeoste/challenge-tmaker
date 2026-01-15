@@ -469,7 +469,7 @@ export default function DashboardPage() {
                               </div>
                             </div>
                             <div className="flex gap-2 ml-4">
-                              <Link href={`/results/${encodeURIComponent(analysis.niche)}`}>
+                              <Link href={analysis.id ? `/results/${encodeURIComponent(analysis.niche)}?id=${analysis.id}` : `/results/${encodeURIComponent(analysis.niche)}`}>
                                 <Button variant="outline" size="sm" className="flex items-center gap-2">
                                   <ExternalLink className="h-4 w-4" />
                                   Voir

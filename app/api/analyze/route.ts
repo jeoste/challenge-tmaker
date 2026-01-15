@@ -54,6 +54,41 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        const body = await request.json();
+        const { niche, forceNew } = body;
+
+        // Validate niche
+        if (!niche || typeof niche !== 'string') {
+            return NextResponse.json(
+                { error: 'Niche parameter is required' },
+                { status: 400 }
+            );
+        }
+
+        // If not forcing a new analysis, check if one exists
+        if (!forceNew && userId) {
+            const { data: existingAnalysis, error: fetchError } = await supabaseAdmin
+                .from('reddit_analyses')
+                .select('*')
+                .eq('user_id', userId)
+                .eq('niche', niche)
+                .order('scanned_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            // If analysis exists and no error (or error is just "no rows"), return it
+            if (existingAnalysis && !fetchError) {
+                console.log(`[Cache] Returning existing analysis for niche: ${niche}`);
+                return NextResponse.json({
+                    id: existingAnalysis.id,
+                    niche: existingAnalysis.niche,
+                    scannedAt: existingAnalysis.scanned_at,
+                    totalPosts: existingAnalysis.total_posts,
+                    pains: existingAnalysis.pains || [],
+                });
+            }
+        }
+
         // Extract IP from various headers (supporting proxies and load balancers)
         const forwardedFor = request.headers.get('x-forwarded-for');
         const realIP = request.headers.get('x-real-ip');
@@ -67,12 +102,6 @@ export async function POST(request: NextRequest) {
             'anonymous';
 
         console.log('[Rate Limit] IP detection - x-forwarded-for:', forwardedFor, 'x-real-ip:', realIP, 'cf-connecting-ip:', cfConnectingIP, 'true-client-ip:', trueClientIP, '-> final IP:', ip);
-
-        const { niche } = await request.json();
-
-        if (!niche) {
-            return NextResponse.json({ error: 'Niche is required' }, { status: 400 });
-        }
 
         // 1. Get user plan (defaults to 'free')
         const userPlan = await getUserPlan(userId);

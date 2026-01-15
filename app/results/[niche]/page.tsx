@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { ResultsHeader } from '@/components/results/ResultsHeader';
 import { LoadingState } from '@/components/results/LoadingState';
 import { PainPointCard } from '@/components/results/PainPointCard';
@@ -14,7 +14,9 @@ import { useAuth } from '@/components/auth/AuthProvider';
 export default function ResultsPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const niche = decodeURIComponent(params.niche as string);
+  const analysisId = searchParams.get('id');
   const { session, loading: authLoading } = useAuth();
   
   const [loading, setLoading] = useState(true);
@@ -87,6 +89,54 @@ export default function ResultsPage() {
         setError(null);
         setErrorDetails(null);
 
+        // If analysisId is provided, fetch that specific analysis
+        if (analysisId) {
+          const analysisResponse = await fetch(
+            `/api/analyze/id/${analysisId}`,
+            {
+              headers: {
+                Authorization: `Bearer ${session.access_token}`,
+              },
+            }
+          );
+
+          if (analysisResponse.ok) {
+            const analysisData = await analysisResponse.json();
+            setData(analysisData);
+            setLoading(false);
+            console.log('Using analysis from ID:', analysisId);
+            return;
+          }
+        }
+
+        // Otherwise, try to fetch existing analysis from database by niche
+        const existingAnalysisResponse = await fetch(
+          `/api/analyze/${encodeURIComponent(niche)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          }
+        );
+
+        if (existingAnalysisResponse.ok) {
+          // Analysis exists, use it
+          const existingData = await existingAnalysisResponse.json();
+          setData(existingData);
+          setLoading(false);
+          console.log('Using existing analysis from database:', existingData.id);
+          return;
+        }
+
+        // If analysis doesn't exist (404), create a new one
+        if (existingAnalysisResponse.status !== 404) {
+          // If it's not a 404, there might be an error
+          const errorData = await existingAnalysisResponse.json().catch(() => ({}));
+          console.warn('Error fetching existing analysis:', errorData);
+          // Continue to create new analysis
+        }
+
+        // Create new analysis
         const response = await fetch('/api/analyze', {
           method: 'POST',
           headers: {
@@ -342,7 +392,7 @@ export default function ResultsPage() {
         <div className="mt-12 text-center">
           <div className="glass-card p-6 inline-block">
             <p className="text-muted-foreground mb-4">
-              Vous voulez analyser une autre niche ?
+              {data.id ? 'Analyse sauvegardée' : 'Vous voulez analyser une autre niche ?'}
             </p>
             <div className="flex gap-3 justify-center">
               <Button
@@ -360,6 +410,44 @@ export default function ResultsPage() {
                   className="flex items-center gap-2"
                 >
                   Voir dans Dashboard
+                </Button>
+              )}
+              {data.id && (
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    // Force a new analysis by adding a query parameter
+                    setLoading(true);
+                    setError(null);
+                    setErrorDetails(null);
+                    try {
+                      const response = await fetch('/api/analyze', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          Authorization: `Bearer ${session?.access_token}`,
+                        },
+                        body: JSON.stringify({ niche, forceNew: true }),
+                      });
+                      if (response.ok) {
+                        const newData = await response.json();
+                        setData(newData);
+                      } else {
+                        const errorData = await response.json().catch(() => ({}));
+                        setError('Erreur lors de la nouvelle analyse');
+                        setErrorDetails(errorData.error || 'Une erreur est survenue.');
+                      }
+                    } catch (err: any) {
+                      setError('Erreur de connexion');
+                      setErrorDetails(err.message || 'Impossible de se connecter au serveur.');
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Nouvelle Analyse
                 </Button>
               )}
             </div>

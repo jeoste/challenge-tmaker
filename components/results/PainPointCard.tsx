@@ -181,22 +181,49 @@ export function PainPointCard({
 
       {/* Center: Title and Summary */}
       <div className="mb-6">
-        <h3 className="text-xl font-bold text-foreground mb-2">
+        <h3 className="text-xl font-bold text-foreground mb-3">
           {painPoint.title}
         </h3>
-        <p className="text-base text-foreground mb-2">
-          💡 <span className="font-semibold">{painPoint.blueprint.solutionName}</span>
-        </p>
-        <p className="text-base text-muted-foreground mb-3 leading-relaxed">
-          {painPoint.blueprint.solutionPitch}
-        </p>
+        
+        {/* Problem Analysis */}
+        <div className="mb-4 p-4 rounded-lg bg-secondary/30 border border-border">
+          <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+            🔍 Problème identifié
+          </h4>
+          <p className="text-sm text-muted-foreground leading-relaxed mb-2">
+            {painPoint.blueprint.problem}
+          </p>
+          {painPoint.blueprint.whyPainPoint && (
+            <p className="text-xs text-muted-foreground italic">
+              💡 {painPoint.blueprint.whyPainPoint}
+            </p>
+          )}
+        </div>
+
+        {/* Solution */}
+        <div className="mb-4">
+          <p className="text-base text-foreground mb-2">
+            💡 <span className="font-semibold">{painPoint.blueprint.solutionName}</span>
+          </p>
+          <p className="text-sm text-muted-foreground mb-2 leading-relaxed">
+            {painPoint.blueprint.solutionPitch}
+          </p>
+          {painPoint.blueprint.howItSolves && (
+            <div className="mt-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
+              <p className="text-xs font-medium text-primary mb-1">Comment ça résout le problème :</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {painPoint.blueprint.howItSolves}
+              </p>
+            </div>
+          )}
+        </div>
         
         {/* Key Features if available */}
         {painPoint.blueprint.keyFeatures && painPoint.blueprint.keyFeatures.length > 0 && (
           <div className="mb-3">
             <p className="text-xs font-medium text-muted-foreground mb-1.5">Fonctionnalités clés :</p>
             <div className="flex flex-wrap gap-1.5">
-              {painPoint.blueprint.keyFeatures.slice(0, 3).map((feature, idx) => (
+              {painPoint.blueprint.keyFeatures.map((feature, idx) => (
                 <span
                   key={idx}
                   className="text-xs px-2 py-0.5 rounded bg-secondary/50 border border-border text-muted-foreground"
@@ -204,6 +231,51 @@ export function PainPointCard({
                   {feature}
                 </span>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Roadmap if available */}
+        {painPoint.blueprint.roadmap && (
+          <div className="mb-4 p-4 rounded-lg bg-gradient-to-br from-primary/10 to-purple-500/10 border border-primary/20">
+            <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+              🗺️ Feuille de route
+            </h4>
+            <div className="space-y-3">
+              {painPoint.blueprint.roadmap.phase1 && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-semibold text-foreground">
+                      Phase 1: {painPoint.blueprint.roadmap.phase1.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {painPoint.blueprint.roadmap.phase1.timeline}
+                    </span>
+                  </div>
+                  <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                    {painPoint.blueprint.roadmap.phase1.features.map((feature, idx) => (
+                      <li key={idx}>{feature}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {painPoint.blueprint.roadmap.phase2 && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-semibold text-foreground">
+                      Phase 2: {painPoint.blueprint.roadmap.phase2.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {painPoint.blueprint.roadmap.phase2.timeline}
+                    </span>
+                  </div>
+                  <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                    {painPoint.blueprint.roadmap.phase2.features.map((feature, idx) => (
+                      <li key={idx}>{feature}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         )}
