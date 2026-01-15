@@ -93,7 +93,11 @@ export default function DashboardPage() {
       }
 
       const data = await response.json();
-      setAnalyses(data.analyses || []);
+      // Deduplicate analyses by ID to prevent duplicates
+      const uniqueAnalyses = Array.from(
+        new Map((data.analyses || []).map((a: Analysis) => [a.id, a])).values()
+      );
+      setAnalyses(uniqueAnalyses);
     } catch (err: any) {
       console.error('Error fetching analyses:', err);
       setError(err.message || 'Une erreur est survenue');

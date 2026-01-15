@@ -60,11 +60,24 @@ export async function GET(request: NextRequest) {
 
     if (!data || data.length === 0) {
       console.log(`No analyses found for user ${userId}`);
-    } else {
-      console.log(`Found ${data.length} analyses for user ${userId}`);
+      return NextResponse.json({ analyses: [] });
     }
 
-    return NextResponse.json({ analyses: data || [] });
+    // Deduplicate analyses: keep only the most recent one for each (user_id, niche) combination
+    const uniqueAnalyses = Array.from(
+      new Map(
+        data.map((analysis: any) => [
+          `${analysis.user_id}-${analysis.niche.toLowerCase().trim()}`,
+          analysis
+        ])
+      ).values()
+    ).sort((a: any, b: any) => 
+      new Date(b.scanned_at).getTime() - new Date(a.scanned_at).getTime()
+    );
+
+    console.log(`Found ${data.length} analyses for user ${userId}, ${uniqueAnalyses.length} unique after deduplication`);
+
+    return NextResponse.json({ analyses: uniqueAnalyses });
   } catch (error) {
     console.error('Dashboard API error:', error);
     return NextResponse.json(
