@@ -58,8 +58,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (data && data.length === 0) {
+    if (!data || data.length === 0) {
       console.log(`No analyses found for user ${userId}`);
+    } else {
+      console.log(`Found ${data.length} analyses for user ${userId}`);
     }
 
     return NextResponse.json({ analyses: data || [] });

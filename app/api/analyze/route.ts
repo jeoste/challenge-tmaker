@@ -5,7 +5,7 @@ import { checkRateLimit, isIPWhitelisted } from '@/lib/rate-limit';
 import { fetchRedditPosts, getSubredditsForNiche } from '@/lib/reddit';
 import { quickFilter, calculateGoldScore } from '@/lib/scoring';
 import { batchLLMAnalysis, generateBlueprint } from '@/lib/llm';
-import { supabaseAdmin, getServerSession } from '@/lib/supabase-server';
+import { supabaseAdmin, getServerSession, getUserPlan } from '@/lib/supabase-server';
 
 // Helper to remove duplicates based on title and selftext
 function removeDuplicates(posts: any[]) {
@@ -72,25 +72,31 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Niche is required' }, { status: 400 });
         }
 
-        // 1. Rate limiting (using user_id since authentication is required)
+        // 1. Get user plan (defaults to 'free')
+        const userPlan = await getUserPlan(userId);
+        console.log(`[Plan] User ${userId} has plan: ${userPlan}`);
+
+        // 2. Rate limiting (using user_id since authentication is required)
         // Check if IP is whitelisted for testing
         const ipWhitelisted = isIPWhitelisted(ip);
         console.log('[Rate Limit] IP whitelist check result:', ipWhitelisted, 'for IP:', ip);
 
         // Use user_id for rate limiting
         const rateLimitIdentifier = `user:${userId}`;
-        console.log('[Rate Limit] Checking rate limit for identifier:', rateLimitIdentifier, 'isWhitelisted:', ipWhitelisted);
-        const rateLimit = await checkRateLimit(rateLimitIdentifier, ipWhitelisted);
+        console.log('[Rate Limit] Checking rate limit for identifier:', rateLimitIdentifier, 'plan:', userPlan, 'isWhitelisted:', ipWhitelisted);
+        const rateLimit = await checkRateLimit(rateLimitIdentifier, ipWhitelisted, userPlan);
         
         if (!rateLimit.allowed) {
             // Log for debugging
-            console.log(`[Rate Limit] BLOCKED - Rate limit exceeded for user:${userId}, IP:${ip}, remaining: ${rateLimit.remaining}, reset: ${new Date(rateLimit.reset).toISOString()}`);
+            const maxScans = userPlan === 'free' ? 3 : 5;
+            console.log(`[Rate Limit] BLOCKED - Rate limit exceeded for user:${userId} (plan: ${userPlan}), IP:${ip}, remaining: ${rateLimit.remaining}, reset: ${new Date(rateLimit.reset).toISOString()}`);
             console.log(`[Rate Limit] IP whitelist status was: ${ipWhitelisted}`);
             return NextResponse.json(
                 {
-                    error: `Rate limit exceeded. Max 5 scans per hour. Detected IP: ${ip}`,
+                    error: `Rate limit exceeded. Max ${maxScans} scans per hour for ${userPlan} plan. Detected IP: ${ip}`,
                     remaining: rateLimit.remaining,
-                    reset: rateLimit.reset
+                    reset: rateLimit.reset,
+                    plan: userPlan
                 },
                 { status: 429 }
             );
@@ -104,15 +110,14 @@ export async function POST(request: NextRequest) {
         }
 
         // 2. Check cache (only if Redis is configured)
-        const cacheKey = `scan:${niche.toLowerCase()}`;
+        // Use a shorter cache TTL (15 minutes instead of 1 hour) to get fresher results
+        // Also include timestamp in cache key to allow for cache busting
+        const cacheKey = `scan:${niche.toLowerCase()}:${Math.floor(Date.now() / (15 * 60 * 1000))}`; // 15-minute buckets
         if (redis) {
             try {
                 const cached = await redis.get(cacheKey);
                 if (cached) {
-                    // Redis might return string or object depending on how it was set/client config. 
-                    // Upstash client usually parses JSON automatically if it was set as JSON object, 
-                    // but if set as stringified JSON, we might need to parse.
-                    // Ideally we store stringified, so let's check.
+                    console.log(`[Cache] Returning cached results for ${niche} (15min bucket)`);
                     try {
                         // If cached is already an object, return it. If string, parse it.
                         const data = typeof cached === 'string' ? JSON.parse(cached) : cached;
@@ -121,6 +126,8 @@ export async function POST(request: NextRequest) {
                         console.error("Cache parse error", e);
                         // If cache is corrupted, proceed to fetch fresh data
                     }
+                } else {
+                    console.log(`[Cache] Cache miss for ${niche}, fetching fresh data`);
                 }
             } catch (error) {
                 // Redis not available, continue without cache
@@ -205,10 +212,20 @@ export async function POST(request: NextRequest) {
             }))
             .sort((a, b) => b.goldScore - a.goldScore);
 
-        // 8. Generate blueprints (top 10 confirmed opportunities)
-        const top10 = rescored.slice(0, 10);
+        // 7.5. Apply plan-based limitations for free users
+        let filteredResults = rescored;
+        if (userPlan === 'free') {
+            // Free plan: only results with score < 80 (80 is the maximum)
+            filteredResults = rescored.filter(post => post.goldScore < 80);
+            console.log(`[Plan] Free plan: Filtered ${rescored.length} results to ${filteredResults.length} (score < 80)`);
+        }
+
+        // 8. Generate blueprints (top 10 for premium, top 3 for free)
+        const maxResults = userPlan === 'free' ? 3 : 10;
+        const topResults = filteredResults.slice(0, maxResults);
+        console.log(`[Plan] Generating ${topResults.length} blueprints for ${userPlan} plan`);
         const pains = await Promise.all(
-            top10.map(async (post, index) => {
+            topResults.map(async (post, index) => {
                 const blueprint = await generateBlueprint(post);
                 return {
                     id: `pain-${index}-${Date.now()}`,
@@ -230,10 +247,12 @@ export async function POST(request: NextRequest) {
             pains
         };
 
-        // Store in Redis (1 hour expiration) - only if Redis is configured
+        // Store in Redis (15 minutes expiration) - only if Redis is configured
+        // Using shorter TTL to get fresher results more frequently
         if (redis) {
             try {
-                await redis.setex(cacheKey, 3600, JSON.stringify(result));
+                await redis.setex(cacheKey, 900, JSON.stringify(result)); // 15 minutes = 900 seconds
+                console.log(`[Cache] Cached results for ${niche} with 15min TTL`);
             } catch (error) {
                 // Redis not available, continue without caching
                 console.warn('Redis not available, skipping cache write');

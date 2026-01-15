@@ -21,6 +21,7 @@ export default function ResultsPage() {
   const [data, setData] = useState<AnalyzeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const painPointRefs = useRef<Record<string, HTMLDivElement>>({});
 
   // Scroll to pain point if hash is present
@@ -38,6 +39,37 @@ export default function ResultsPage() {
       }
     }
   }, [data]);
+
+  const fetchFavorites = async () => {
+    if (!session?.access_token || !data?.id) return;
+    
+    try {
+      const response = await fetch('/api/favorites', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      
+      if (response.ok) {
+        const favoritesData = await response.json();
+        const favoriteSet = new Set<string>();
+        favoritesData.favorites?.forEach((f: any) => {
+          if (f.analysis_id === data.id) {
+            favoriteSet.add(f.pain_point_id);
+          }
+        });
+        setFavorites(favoriteSet);
+      }
+    } catch (err) {
+      console.error('Error fetching favorites:', err);
+    }
+  };
+
+  // Fetch favorites when user is authenticated and data is loaded
+  useEffect(() => {
+    if (session?.access_token && data?.id) {
+      fetchFavorites();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.access_token, data?.id]);
 
   useEffect(() => {
     const fetchResults = async () => {
@@ -298,6 +330,9 @@ export default function ResultsPage() {
                 niche={niche}
                 analysisId={data.id}
                 index={index}
+                sessionToken={session?.access_token || null}
+                isFavorited={favorites.has(pain.id)}
+                onFavoriteToggle={fetchFavorites}
               />
             </div>
           ))}

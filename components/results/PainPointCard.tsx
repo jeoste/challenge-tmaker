@@ -1,19 +1,23 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Copy, Share2 } from 'lucide-react';
+import { Copy, Share2, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { GoldScoreBadge } from '@/components/shared/GoldScoreBadge';
 import { ShareButton } from '@/components/shared/ShareButton';
 import { PainPoint } from '@/types';
 import { toast } from 'sonner';
+import { useState, useEffect } from 'react';
 
 interface PainPointCardProps {
   painPoint: PainPoint;
   niche: string;
   analysisId?: string;
   index: number;
+  sessionToken?: string | null;
+  isFavorited?: boolean;
+  onFavoriteToggle?: () => void;
 }
 
 export function PainPointCard({
@@ -21,7 +25,71 @@ export function PainPointCard({
   niche,
   analysisId,
   index,
+  sessionToken,
+  isFavorited: initialIsFavorited = false,
+  onFavoriteToggle,
 }: PainPointCardProps) {
+  const [isFavorited, setIsFavorited] = useState(initialIsFavorited);
+  const [isToggling, setIsToggling] = useState(false);
+
+  useEffect(() => {
+    setIsFavorited(initialIsFavorited);
+  }, [initialIsFavorited]);
+
+  const handleToggleFavorite = async () => {
+    if (!sessionToken || !analysisId) {
+      toast.error('Vous devez être connecté pour ajouter aux favoris');
+      return;
+    }
+
+    setIsToggling(true);
+    try {
+      if (isFavorited) {
+        // Remove favorite
+        const response = await fetch(`/api/favorites?analysis_id=${analysisId}&pain_point_id=${painPoint.id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${sessionToken}` },
+        });
+
+        if (response.ok) {
+          setIsFavorited(false);
+          toast.success('Retiré des favoris');
+          onFavoriteToggle?.();
+        } else {
+          const errorData = await response.json();
+          toast.error(errorData.error || 'Erreur lors de la suppression');
+        }
+      } else {
+        // Add favorite
+        const response = await fetch('/api/favorites', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${sessionToken}`,
+          },
+          body: JSON.stringify({
+            analysis_id: analysisId,
+            pain_point_id: painPoint.id,
+            pain_point_data: painPoint,
+          }),
+        });
+
+        if (response.ok) {
+          setIsFavorited(true);
+          toast.success('Ajouté aux favoris');
+          onFavoriteToggle?.();
+        } else {
+          const errorData = await response.json();
+          toast.error(errorData.error || 'Erreur lors de l\'ajout aux favoris');
+        }
+      }
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
+      toast.error('Une erreur est survenue');
+    } finally {
+      setIsToggling(false);
+    }
+  };
   const handleCopyBlueprint = () => {
     const blueprintText = `Problem: ${painPoint.blueprint.problem}\n\nSolution: ${painPoint.blueprint.solutionName}\n${painPoint.blueprint.solutionPitch}\n\nMarket Size: ${painPoint.blueprint.marketSize}\nFirst Channel: ${painPoint.blueprint.firstChannel}\nMRR Estimate: ${painPoint.blueprint.mrrEstimate}\nTech Stack: ${painPoint.blueprint.techStack}`;
     
@@ -186,6 +254,20 @@ export function PainPointCard({
 
       {/* Actions */}
       <div className="flex gap-3 justify-end">
+        {sessionToken && analysisId && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleToggleFavorite}
+            disabled={isToggling}
+            className={`flex items-center gap-2 ${
+              isFavorited ? 'text-yellow-500 border-yellow-500/30 hover:bg-yellow-500/10' : ''
+            }`}
+          >
+            <Star className={`h-4 w-4 ${isFavorited ? 'fill-current' : ''}`} />
+            {isFavorited ? 'Favori' : 'Favoris'}
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"

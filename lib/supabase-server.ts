@@ -48,3 +48,25 @@ export async function getServerUser() {
     const session = await getServerSession();
     return session?.user ?? null;
 }
+
+// Helper to get user plan (defaults to 'free')
+export async function getUserPlan(userId: string): Promise<'free' | 'premium'> {
+    try {
+        const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+        if (error || !data?.user) {
+            console.warn(`[Plan] Could not fetch user ${userId}, defaulting to free plan`);
+            return 'free';
+        }
+        
+        // Check user_metadata for plan
+        const plan = data.user.user_metadata?.plan as string | undefined;
+        if (plan === 'premium' || plan === 'pro') {
+            return 'premium';
+        }
+        
+        return 'free';
+    } catch (error) {
+        console.error(`[Plan] Error fetching plan for user ${userId}:`, error);
+        return 'free'; // Default to free on error
+    }
+}

@@ -27,18 +27,21 @@ export async function batchLLMAnalysis(
     const prompt = `Tu es un expert en identification d'opportunités SaaS. Analyse ces posts Reddit et identifie UNIQUEMENT ceux qui représentent de VRAIES opportunités business monétisables.
 
 CRITÈRES STRICTS pour une opportunité valide :
-✅ L'utilisateur exprime un BESOIN ou un PROBLÈME récurrent
-✅ Le problème peut être résolu par un produit/service SaaS
-✅ Il y a une DEMANDE claire (pas juste une discussion ou une plainte)
+✅ L'utilisateur exprime un BESOIN ou un PROBLÈME récurrent qui peut être résolu par un SaaS
+✅ Il y a une DEMANDE claire pour un outil/solution (ex: "looking for", "need a tool", "best alternative to")
 ✅ Le problème n'est PAS déjà résolu par des solutions majeures existantes
 ✅ Il y a un POTENTIEL de marché (plusieurs personnes ont le même problème)
+✅ Le post cherche activement une solution, pas juste une discussion
 
-❌ REJETER si :
-- C'est juste une discussion ou un partage d'expérience
-- C'est un conseil ou une explication technique
-- Le problème est déjà résolu par des solutions bien établies
+❌ REJETER ABSOLUMENT si :
+- C'est un avertissement de sécurité ou un conseil (ex: "Stop pasting API keys", "Don't do X")
+- C'est un tutoriel, guide ou explication technique
+- C'est un partage d'expérience sans demande de solution
+- C'est une annonce de projet/lancement ("I just built...", "Check out my...")
+- C'est une discussion métier sans demande concrète
 - C'est une plainte sans demande de solution
-- Pas de potentiel business clair
+- Le problème est déjà bien résolu par des solutions établies
+- Pas de potentiel business monétisable clair
 
 Pour chaque post, évalue avec un relevanceScore entre 0.5 et 1.5:
 - 1.5 = Problème très monétisable, demande claire et urgente, marché validé

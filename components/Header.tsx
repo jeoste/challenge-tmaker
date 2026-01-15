@@ -5,6 +5,16 @@ import { useRouter } from "next/navigation";
 import { Logo } from "./Logo";
 import { useAuth } from "./auth/AuthProvider";
 import { Button } from "./ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { Badge } from "./ui/badge";
+import { User, LogOut, Settings, LayoutDashboard } from "lucide-react";
 
 export const Header = () => {
   const { user, loading, signOut } = useAuth();
@@ -33,37 +43,57 @@ export const Header = () => {
             <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               Pricing
             </Link>
-            {user && (
-              <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                Dashboard
-              </Link>
-            )}
           </nav>
           <div className="flex items-center gap-4">
             {!loading && (
               <>
                 {user ? (
-                  <>
-                    <Link href="/dashboard">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
-                        size="sm"
-                        className="hidden sm:inline-flex"
+                        className="flex items-center gap-2 hover:bg-secondary/50"
                       >
-                        Dashboard
+                        <Badge variant="outline" className="flex items-center gap-1.5 px-2 py-1">
+                          <User className="h-3 w-3" />
+                        </Badge>
+                        <span className="text-sm text-foreground hidden sm:inline">
+                          {user.email}
+                        </span>
                       </Button>
-                    </Link>
-                    <span className="text-sm text-muted-foreground hidden sm:inline">
-                      {user.email}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleSignOut}
-                    >
-                      Déconnexion
-                    </Button>
-                  </>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56 glass-card">
+                      <DropdownMenuLabel className="font-normal">
+                        <div className="flex flex-col space-y-1">
+                          <p className="text-sm font-medium leading-none">Mon compte</p>
+                          <p className="text-xs leading-none text-muted-foreground">
+                            {user.email}
+                          </p>
+                        </div>
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link href="/dashboard" className="flex items-center gap-2 cursor-pointer">
+                          <LayoutDashboard className="h-4 w-4" />
+                          Dashboard
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/settings" className="flex items-center gap-2 cursor-pointer">
+                          <Settings className="h-4 w-4" />
+                          Settings
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={handleSignOut}
+                        className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Log out
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 ) : (
                   <>
                     <Link href="/signup">

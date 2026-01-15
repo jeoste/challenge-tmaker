@@ -10,10 +10,18 @@ const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_RE
     })
     : null;
 
-export const ratelimit = redis
+// Rate limiters for different plans
+export const ratelimitPremium = redis
     ? new Ratelimit({
         redis,
-        limiter: Ratelimit.slidingWindow(5, '1 h'), // 5 requests per hour
+        limiter: Ratelimit.slidingWindow(5, '1 h'), // 5 requests per hour for premium
+    })
+    : null;
+
+export const ratelimitFree = redis
+    ? new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(3, '1 h'), // 3 requests per hour for free plan
     })
     : null;
 
@@ -81,7 +89,11 @@ export function isIPWhitelisted(ip: string): boolean {
     return isWhitelisted;
 }
 
-export async function checkRateLimit(identifier: string, isWhitelisted: boolean = false) {
+export async function checkRateLimit(
+    identifier: string, 
+    isWhitelisted: boolean = false,
+    userPlan: 'free' | 'premium' = 'free'
+) {
     // If IP is whitelisted, bypass rate limiting
     if (isWhitelisted) {
         console.log('[Rate Limit] Bypassing rate limit for whitelisted IP, identifier:', identifier);
@@ -93,12 +105,16 @@ export async function checkRateLimit(identifier: string, isWhitelisted: boolean 
         };
     }
 
+    // Select the appropriate rate limiter based on user plan
+    const ratelimit = userPlan === 'premium' ? ratelimitPremium : ratelimitFree;
+    const expectedLimit = userPlan === 'premium' ? 5 : 3;
+
     // If rate limiting is not configured, allow all requests
     if (!ratelimit) {
         return {
             allowed: true,
-            limit: 999,
-            remaining: 999,
+            limit: expectedLimit,
+            remaining: expectedLimit,
             reset: Date.now() + 3600000
         };
     }
