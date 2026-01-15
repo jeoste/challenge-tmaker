@@ -50,8 +50,31 @@ export async function getServerUser() {
 }
 
 // Helper to get user plan (defaults to 'free')
+// Checks both user_metadata and active Polar.sh subscriptions
 export async function getUserPlan(userId: string): Promise<'free' | 'premium'> {
     try {
+        // First, check for active Polar.sh subscription
+        const { data: subscription, error: subError } = await supabaseAdmin
+            .from('polar_subscriptions')
+            .select('status, current_period_end')
+            .eq('user_id', userId)
+            .eq('status', 'active')
+            .single();
+
+        if (!subError && subscription) {
+            // Check if subscription is still within current period
+            if (subscription.current_period_end) {
+                const periodEnd = new Date(subscription.current_period_end);
+                if (periodEnd > new Date()) {
+                    return 'premium';
+                }
+            } else {
+                // If no period_end, assume active if status is active
+                return 'premium';
+            }
+        }
+
+        // Fallback to user_metadata
         const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
         if (error || !data?.user) {
             console.warn(`[Plan] Could not fetch user ${userId}, defaulting to free plan`);

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { SearchBar } from "@/components/SearchBar";
 import { NicheSuggestions } from "@/components/NicheSuggestions";
 import { RotatingWords } from "@/components/RotatingWords";
@@ -55,6 +56,8 @@ export default function Home() {
         {/* Bottom gradient fade */}
         <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent pointer-events-none" />
       </main>
+
+      <Footer />
     </div>
   );
 }

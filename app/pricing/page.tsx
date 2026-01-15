@@ -1,6 +1,7 @@
 "use client";
 
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { Pricing } from "@/components/Pricing";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -26,6 +27,8 @@ export default function PricingPage() {
       <main className="pt-20">
         <Pricing />
       </main>
+
+      <Footer />
     </div>
   );
 }

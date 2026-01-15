@@ -2,6 +2,9 @@
 
 import { Check, X } from "lucide-react";
 import { Button } from "./ui/button";
+import { useState } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { toast } from "sonner";
 
 const freePlan = {
   name: "Free",
@@ -36,19 +39,55 @@ const premiumPlan = {
     "Priority support",
     "Early access to new features",
   ],
-  cta: "Start free trial",
+  limitations: [], // Empty array to maintain alignment with Free plan
+  cta: "Subscribe now",
   popular: true,
 };
 
 export const Pricing = () => {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+
   const handleFreePlan = () => {
     // Redirect to signup page
     window.location.href = '/signup';
   };
 
-  const handlePremiumPlan = () => {
-    // Redirect to signup with premium plan
-    window.location.href = '/signup?plan=premium';
+  const handlePremiumPlan = async () => {
+    // If user is not logged in, redirect to signup
+    if (!user) {
+      window.location.href = '/signup?plan=premium';
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Create checkout session via API
+      const response = await fetch('/api/polar/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create checkout session');
+      }
+
+      // Redirect to Polar checkout
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        throw new Error('No checkout URL received');
+      }
+    } catch (error: any) {
+      console.error('Error creating checkout:', error);
+      toast.error(error.message || 'Failed to start checkout process');
+      setLoading(false);
+    }
   };
 
   return (
@@ -63,7 +102,7 @@ export const Pricing = () => {
             Choose your plan
           </h2>
           <p className="text-muted-foreground text-lg md:text-xl max-w-2xl mx-auto">
-            Start free and upgrade when you're ready to unlock the full potential
+            Start with our free plan and upgrade to Pro when you're ready to unlock the full potential
           </p>
         </div>
 
@@ -179,14 +218,28 @@ export const Pricing = () => {
                     <span className="text-foreground text-sm">{feature}</span>
                   </div>
                 ))}
+
+                {premiumPlan.limitations.map((limitation, index) => (
+                  <div
+                    key={limitation}
+                    className="flex items-center gap-3 stagger-item"
+                    style={{ animationDelay: `${(premiumPlan.features.length + index) * 0.05}s` }}
+                  >
+                    <div className="w-5 h-5 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center shrink-0">
+                      <X className="w-3 h-3 text-red-500" />
+                    </div>
+                    <span className="text-muted-foreground text-sm">{limitation}</span>
+                  </div>
+                ))}
               </div>
 
               {/* CTA Button */}
               <Button
                 onClick={handlePremiumPlan}
-                className="w-full py-6 text-base font-semibold bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90 text-foreground border-0 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+                disabled={loading}
+                className="w-full py-6 text-base font-semibold bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90 text-foreground border-0 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {premiumPlan.cta}
+                {loading ? 'Chargement...' : premiumPlan.cta}
               </Button>
             </div>
           </div>
