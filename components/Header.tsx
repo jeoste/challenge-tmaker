@@ -1,9 +1,21 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Logo } from "./Logo";
+import { useAuth } from "./auth/AuthProvider";
+import { Button } from "./ui/button";
 
 export const Header = () => {
+  const { user, loading, signOut } = useAuth();
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.push('/');
+    router.refresh();
+  };
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
       <div className="mx-auto max-w-7xl px-6 py-4">
@@ -20,9 +32,33 @@ export const Header = () => {
               API
             </Link>
           </nav>
-          <button className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
-            Get Started
-          </button>
+          <div className="flex items-center gap-4">
+            {!loading && (
+              <>
+                {user ? (
+                  <>
+                    <span className="text-sm text-muted-foreground hidden sm:inline">
+                      {user.email}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSignOut}
+                    >
+                      Déconnexion
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={() => router.push('/login')}
+                  >
+                    Se connecter
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </header>

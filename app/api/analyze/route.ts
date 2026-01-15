@@ -5,6 +5,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { fetchRedditPosts, getSubredditsForNiche } from '@/lib/reddit';
 import { quickFilter, calculateGoldScore } from '@/lib/scoring';
 import { batchLLMAnalysis, generateBlueprint } from '@/lib/llm';
+import { supabaseAdmin, getServerSession } from '@/lib/supabase-server';
 
 // Helper to remove duplicates based on title and selftext
 function removeDuplicates(posts: any[]) {
@@ -18,17 +19,27 @@ function removeDuplicates(posts: any[]) {
 }
 
 export async function POST(request: NextRequest) {
+    const startTime = Date.now();
+    
     try {
+        // 0. Authentication check
+        const session = await getServerSession();
+        if (!session) {
+            return NextResponse.json(
+                { error: 'Authentication required' },
+                { status: 401 }
+            );
+        }
+
+        const userId = session.user.id;
         const { niche } = await request.json();
 
         if (!niche) {
             return NextResponse.json({ error: 'Niche is required' }, { status: 400 });
         }
 
-        // 1. Rate limiting
-        const ip = request.headers.get('x-forwarded-for') || 'unknown';
-        // In dev, sometimes we might want to bypass strict rate limiting or use a dummy IP
-        const rateLimit = await checkRateLimit(ip);
+        // 1. Rate limiting (using user_id instead of IP)
+        const rateLimit = await checkRateLimit(userId);
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 { error: 'Rate limit exceeded. Max 5 scans per hour.' },
@@ -36,21 +47,28 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // 2. Check cache
+        // 2. Check cache (only if Redis is configured)
         const cacheKey = `scan:${niche.toLowerCase()}`;
-        const cached = await redis.get(cacheKey);
-        if (cached) {
-            // Redis might return string or object depending on how it was set/client config. 
-            // Upstash client usually parses JSON automatically if it was set as JSON object, 
-            // but if set as stringified JSON, we might need to parse.
-            // Ideally we store stringified, so let's check.
+        if (redis) {
             try {
-                // If cached is already an object, return it. If string, parse it.
-                const data = typeof cached === 'string' ? JSON.parse(cached) : cached;
-                return NextResponse.json(data);
-            } catch (e) {
-                console.error("Cache parse error", e);
-                // If cache is corrupted, proceed to fetch fresh data
+                const cached = await redis.get(cacheKey);
+                if (cached) {
+                    // Redis might return string or object depending on how it was set/client config. 
+                    // Upstash client usually parses JSON automatically if it was set as JSON object, 
+                    // but if set as stringified JSON, we might need to parse.
+                    // Ideally we store stringified, so let's check.
+                    try {
+                        // If cached is already an object, return it. If string, parse it.
+                        const data = typeof cached === 'string' ? JSON.parse(cached) : cached;
+                        return NextResponse.json(data);
+                    } catch (e) {
+                        console.error("Cache parse error", e);
+                        // If cache is corrupted, proceed to fetch fresh data
+                    }
+                }
+            } catch (error) {
+                // Redis not available, continue without cache
+                console.warn('Redis not available, skipping cache check');
             }
         }
 
@@ -65,17 +83,55 @@ export async function POST(request: NextRequest) {
         // 4. Quick filter
         const filtered = posts.filter(quickFilter);
 
+        // 4.5. Group similar posts for counting
+        function groupSimilarPosts(posts: any[]): Map<string, number> {
+            const groups = new Map<string, number>();
+            const processed = new Set<string>();
+            
+            posts.forEach((post, i) => {
+                if (processed.has(post.id)) return;
+                
+                const titleWords = post.title.toLowerCase().split(/\s+/).filter((w: string) => w.length > 3);
+                let count = 1;
+                const similarIds = [post.id];
+                
+                posts.slice(i + 1).forEach((otherPost) => {
+                    if (processed.has(otherPost.id)) return;
+                    
+                    const otherWords = otherPost.title.toLowerCase().split(/\s+/).filter((w: string) => w.length > 3);
+                    const commonWords = titleWords.filter((w: string) => otherWords.includes(w));
+                    const similarity = commonWords.length / Math.max(titleWords.length, otherWords.length);
+                    
+                    // If similarity > 0.3, consider them similar
+                    if (similarity > 0.3) {
+                        count++;
+                        similarIds.push(otherPost.id);
+                    }
+                });
+                
+                similarIds.forEach(id => {
+                    groups.set(id, count);
+                    processed.add(id);
+                });
+            });
+            
+            return groups;
+        }
+        
+        const similarCounts = groupSimilarPosts(filtered);
+
         // 5. Score & sort (Initial scoring for prioritization before expensive LLM)
         const scored = filtered
             .map(post => ({
                 ...post,
-                goldScore: calculateGoldScore(post)
+                goldScore: calculateGoldScore(post),
+                similarPostsCount: similarCounts.get(post.id) || 1
             }))
             .sort((a, b) => b.goldScore - a.goldScore)
             .slice(0, 20);  // Top 20 for LLM analysis
 
         // 6. LLM batch analysis
-        let llmFiltered = [];
+        let llmFiltered: Array<any & { relevanceScore: number }> = [];
         if (scored.length > 0) {
             llmFiltered = await batchLLMAnalysis(scored);
         } else {
@@ -84,25 +140,33 @@ export async function POST(request: NextRequest) {
             console.log(`No posts passed quick filter for ${niche}`);
         }
 
-        // 7. Generate blueprints (top 10 confirmed opportunities)
-        const top10 = llmFiltered.slice(0, 10);
+        // 7. Recalculate scores with LLM relevance and sort
+        const rescored = llmFiltered
+            .map(post => ({
+                ...post,
+                goldScore: Math.round(calculateGoldScore(post, post.relevanceScore)),
+                postsCount: post.similarPostsCount || 1
+            }))
+            .sort((a, b) => b.goldScore - a.goldScore);
+
+        // 8. Generate blueprints (top 10 confirmed opportunities)
+        const top10 = rescored.slice(0, 10);
         const pains = await Promise.all(
             top10.map(async (post, index) => {
                 const blueprint = await generateBlueprint(post);
-                // Recalculate score with LLM relevance if we had that data (simplified here)
                 return {
                     id: `pain-${index}-${Date.now()}`,
                     title: post.title,
                     selftext: post.selftext || '',
                     subreddit: post.subreddit,
-                    goldScore: Math.round(calculateGoldScore(post, 1.2)), // Assume slightly higher relevance if it passed LLM
-                    postsCount: 1, // Simplified for now
+                    goldScore: post.goldScore,
+                    postsCount: post.postsCount || 1,
                     blueprint
                 };
             })
         );
 
-        // 8. Cache results
+        // 9. Cache results
         const result = {
             niche,
             scannedAt: new Date().toISOString(),
@@ -110,10 +174,59 @@ export async function POST(request: NextRequest) {
             pains
         };
 
-        // Store in Redis (1 hour expiration)
-        await redis.setex(cacheKey, 3600, JSON.stringify(result));
+        // Store in Redis (1 hour expiration) - only if Redis is configured
+        if (redis) {
+            try {
+                await redis.setex(cacheKey, 3600, JSON.stringify(result));
+            } catch (error) {
+                // Redis not available, continue without caching
+                console.warn('Redis not available, skipping cache write');
+            }
+        }
 
-        return NextResponse.json(result);
+        // 10. Save to Supabase
+        const { data: analysisData, error: analysisError } = await supabaseAdmin
+            .from('reddit_analyses')
+            .insert({
+                user_id: userId,
+                niche,
+                scanned_at: new Date().toISOString(),
+                total_posts: posts.length,
+                pains: pains
+            })
+            .select()
+            .single();
+
+        if (analysisError) {
+            console.error('Error saving to Supabase:', analysisError);
+            // Continue even if Supabase save fails
+        }
+
+        // 11. Log metrics
+        const duration = Date.now() - startTime;
+        const ip = request.headers.get('x-forwarded-for') || 'unknown';
+        
+        await supabaseAdmin
+            .from('scan_logs')
+            .insert({
+                user_id: userId,
+                niche,
+                duration_ms: duration,
+                posts_found: posts.length,
+                pains_generated: pains.length,
+                ip_address: ip
+            })
+            .catch(err => {
+                console.error('Error logging metrics:', err);
+                // Don't fail the request if logging fails
+            });
+
+        // Include analysis ID in response if saved successfully
+        const response = analysisData 
+            ? { ...result, id: analysisData.id }
+            : result;
+
+        return NextResponse.json(response);
     } catch (error) {
         console.error('Analyze error:', error);
         return NextResponse.json(

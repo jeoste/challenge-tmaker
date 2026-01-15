@@ -13,6 +13,11 @@ export const metadata: Metadata = {
   title: "Reddit Goldmine - Trouve des Idées SaaS Validées par Reddit",
   description:
     "Scanne automatiquement les pain points Reddit et génère des blueprints de micro-SaaS prêts à lancer",
+  icons: {
+    icon: '/icon.png',
+    shortcut: '/icon.png',
+    apple: '/icon.png',
+  },
 };
 
 export default function RootLayout({

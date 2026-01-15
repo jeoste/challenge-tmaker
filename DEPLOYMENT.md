@@ -40,8 +40,8 @@ Vercel se connecte directement à votre repository GitHub et déploie automatiqu
 ### Pour tous les environnements
 
 ```env
-# OpenAI (pour les blueprints IA)
-OPENAI_API_KEY=sk-...
+# Gemini (pour les blueprints IA)
+GEMINI_API_KEY=...
 
 # Upstash Redis (cache + rate limiting)
 UPSTASH_REDIS_REST_URL=https://...

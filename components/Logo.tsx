@@ -1,4 +1,4 @@
-import { Gem } from "lucide-react";
+import Image from "next/image";
 
 export const Logo = () => {
   return (
@@ -6,7 +6,13 @@ export const Logo = () => {
       <div className="relative">
         <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
         <div className="relative p-2 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20">
-          <Gem className="w-5 h-5 text-primary" />
+          <Image
+            src="/icon.png"
+            alt="Reddit Goldmine Logo"
+            width={20}
+            height={20}
+            className="w-5 h-5"
+          />
         </div>
       </div>
       <span className="font-semibold text-lg text-foreground">
