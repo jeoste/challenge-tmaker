@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { redis } from '@/lib/cache';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { checkRateLimit, isIPWhitelisted } from '@/lib/rate-limit';
 import { fetchRedditPosts, getSubredditsForNiche } from '@/lib/reddit';
 import { quickFilter, calculateGoldScore } from '@/lib/scoring';
 import { batchLLMAnalysis, generateBlueprint } from '@/lib/llm';
@@ -37,13 +37,28 @@ export async function POST(request: NextRequest) {
         }
 
         // 1. Rate limiting (using user_id if authenticated, otherwise IP)
-        const rateLimitIdentifier = userId || ip;
-        const rateLimit = await checkRateLimit(rateLimitIdentifier);
+        // Check if IP is whitelisted for testing
+        const ipWhitelisted = isIPWhitelisted(ip);
+        
+        // Use a prefix for authenticated users to separate their limit from IP-based limit
+        const rateLimitIdentifier = userId ? `user:${userId}` : `ip:${ip}`;
+        const rateLimit = await checkRateLimit(rateLimitIdentifier, ipWhitelisted);
         if (!rateLimit.allowed) {
+            // Log for debugging
+            console.log(`Rate limit exceeded for ${userId ? `user:${userId}` : `ip:${ip}`}, remaining: ${rateLimit.remaining}, reset: ${new Date(rateLimit.reset).toISOString()}`);
             return NextResponse.json(
-                { error: 'Rate limit exceeded. Max 5 scans per hour.' },
+                { 
+                    error: 'Rate limit exceeded. Max 5 scans per hour.',
+                    remaining: rateLimit.remaining,
+                    reset: rateLimit.reset
+                },
                 { status: 429 }
             );
+        }
+        
+        // Log if IP is whitelisted (for debugging)
+        if (ipWhitelisted) {
+            console.log(`IP ${ip} is whitelisted - rate limit bypassed`);
         }
 
         // 2. Check cache (only if Redis is configured)

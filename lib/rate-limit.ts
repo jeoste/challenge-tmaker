@@ -17,7 +17,56 @@ export const ratelimit = redis
     })
     : null;
 
-export async function checkRateLimit(identifier: string) {
+/**
+ * Check if an IP address is whitelisted for testing
+ * Supports both IPv4 and IPv6 addresses
+ */
+export function isIPWhitelisted(ip: string): boolean {
+    if (!ip || ip === 'anonymous') {
+        return false;
+    }
+
+    const whitelistedIPs: string[] = [];
+    
+    // Add IPv4 from environment variable
+    if (process.env.IPV4_PUBLIC_TESTING) {
+        whitelistedIPs.push(process.env.IPV4_PUBLIC_TESTING.trim());
+    }
+    
+    // Add IPv6 from environment variable
+    if (process.env.IPV6_PUBLIC_TESTING) {
+        whitelistedIPs.push(process.env.IPV6_PUBLIC_TESTING.trim());
+    }
+
+    // Check if IP matches any whitelisted IP
+    return whitelistedIPs.some(whitelistedIP => {
+        // Exact match
+        if (ip === whitelistedIP) {
+            return true;
+        }
+        
+        // For IPv6, also check without brackets and normalized formats
+        const normalizedIP = ip.replace(/^\[|\]$/g, '');
+        const normalizedWhitelisted = whitelistedIP.replace(/^\[|\]$/g, '');
+        if (normalizedIP === normalizedWhitelisted) {
+            return true;
+        }
+        
+        return false;
+    });
+}
+
+export async function checkRateLimit(identifier: string, isWhitelisted: boolean = false) {
+    // If IP is whitelisted, bypass rate limiting
+    if (isWhitelisted) {
+        return {
+            allowed: true,
+            limit: 999,
+            remaining: 999,
+            reset: Date.now() + 3600000
+        };
+    }
+
     // If rate limiting is not configured, allow all requests
     if (!ratelimit) {
         return {

@@ -64,7 +64,18 @@ export default function ResultsPage() {
           
           if (response.status === 429) {
             setError('Limite de requêtes atteinte');
-            setErrorDetails('Vous avez atteint la limite de 5 scans par heure. Veuillez réessayer plus tard.');
+            const resetTime = errorData.reset ? new Date(errorData.reset).toLocaleTimeString('fr-FR') : null;
+            const remaining = errorData.remaining !== undefined ? errorData.remaining : 0;
+            let details = 'Vous avez atteint la limite de 5 scans par heure.';
+            if (resetTime) {
+              details += ` Vous pourrez réessayer après ${resetTime}.`;
+            } else {
+              details += ' Veuillez réessayer plus tard.';
+            }
+            if (remaining === 0) {
+              details += ' Si vous venez de créer un compte, il se peut que vous ayez déjà utilisé votre quota avant de vous connecter.';
+            }
+            setErrorDetails(details);
             return;
           }
           
@@ -136,25 +147,54 @@ export default function ResultsPage() {
               </Button>
               <Button 
                 variant="outline"
-                onClick={() => {
+                onClick={async () => {
                   setError(null);
                   setErrorDetails(null);
                   setLoading(true);
-                  // Retry fetch
-                  fetch('/api/analyze', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ niche }),
-                  })
-                    .then(res => res.json())
-                    .then(result => {
-                      setData(result);
-                      setLoading(false);
-                    })
-                    .catch(() => {
-                      setError('Erreur lors du scan');
-                      setLoading(false);
+                  try {
+                    // Retry fetch
+                    const response = await fetch('/api/analyze', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ niche }),
                     });
+
+                    if (!response.ok) {
+                      const errorData = await response.json().catch(() => ({}));
+                      
+                      if (response.status === 429) {
+                        setError('Limite de requêtes atteinte');
+                        const resetTime = errorData.reset ? new Date(errorData.reset).toLocaleTimeString('fr-FR') : null;
+                        const remaining = errorData.remaining !== undefined ? errorData.remaining : 0;
+                        let details = 'Vous avez atteint la limite de 5 scans par heure.';
+                        if (resetTime) {
+                          details += ` Vous pourrez réessayer après ${resetTime}.`;
+                        } else {
+                          details += ' Veuillez réessayer plus tard.';
+                        }
+                        if (remaining === 0) {
+                          details += ' Si vous venez de créer un compte, il se peut que vous ayez déjà utilisé votre quota avant de vous connecter.';
+                        }
+                        setErrorDetails(details);
+                        setLoading(false);
+                        return;
+                      }
+                      
+                      setError('Erreur lors du scan');
+                      setErrorDetails(errorData.error || 'Une erreur est survenue. Veuillez réessayer.');
+                      setLoading(false);
+                      return;
+                    }
+
+                    const result = await response.json();
+                    setData(result);
+                    setLoading(false);
+                  } catch (err: any) {
+                    console.error('Error retrying fetch:', err);
+                    setError('Erreur de connexion');
+                    setErrorDetails(err.message || 'Impossible de se connecter au serveur.');
+                    setLoading(false);
+                  }
                 }}
                 className="flex items-center gap-2"
               >
@@ -168,7 +208,7 @@ export default function ResultsPage() {
     );
   }
 
-  if (!data || data.pains.length === 0) {
+  if (!data || !data.pains || data.pains.length === 0) {
     return (
       <div className="min-h-screen bg-background px-6 py-12">
         <div className="max-w-6xl mx-auto">
