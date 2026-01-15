@@ -9,11 +9,13 @@ import { Button } from '@/components/ui/button';
 import { AnalyzeResponse } from '@/types';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, RefreshCw, AlertCircle, LayoutDashboard } from 'lucide-react';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 export default function ResultsPage() {
   const params = useParams();
   const router = useRouter();
   const niche = decodeURIComponent(params.niche as string);
+  const { session, loading: authLoading } = useAuth();
   
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<AnalyzeResponse | null>(null);
@@ -40,6 +42,15 @@ export default function ResultsPage() {
   useEffect(() => {
     const fetchResults = async () => {
       try {
+        if (authLoading) return;
+        if (!session?.access_token) {
+          setError('Authentification requise');
+          setErrorDetails('Vous devez être connecté pour effectuer un scan.');
+          setTimeout(() => router.push('/login'), 2000);
+          setLoading(false);
+          return;
+        }
+
         setLoading(true);
         setError(null);
         setErrorDetails(null);
@@ -48,6 +59,7 @@ export default function ResultsPage() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({ niche }),
         });
@@ -109,7 +121,7 @@ export default function ResultsPage() {
     };
 
     fetchResults();
-  }, [niche, router]);
+  }, [niche, router, session?.access_token, authLoading]);
 
   if (loading) {
     return (
@@ -159,10 +171,21 @@ export default function ResultsPage() {
                   setErrorDetails(null);
                   setLoading(true);
                   try {
+                    if (!session?.access_token) {
+                      setError('Authentification requise');
+                      setErrorDetails('Vous devez être connecté pour effectuer un scan.');
+                      setTimeout(() => router.push('/login'), 2000);
+                      setLoading(false);
+                      return;
+                    }
+
                     // Retry fetch
                     const response = await fetch('/api/analyze', {
                       method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
+                      headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${session.access_token}`,
+                      },
                       body: JSON.stringify({ niche }),
                     });
 

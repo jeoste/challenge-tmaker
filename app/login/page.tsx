@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { LoginForm } from '@/components/auth/LoginForm';
@@ -10,11 +10,14 @@ export default function LoginPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get('redirect');
+
   useEffect(() => {
     if (!loading && user) {
-      router.push('/');
+      router.push(redirect || '/');
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, redirect]);
 
   if (loading) {
     return (
@@ -25,7 +28,11 @@ export default function LoginPage() {
   }
 
   if (user) {
-    return null;
+    return (
+      <div className="min-h-screen bg-canvas flex items-center justify-center">
+        <div className="text-muted-foreground">Redirection en cours...</div>
+      </div>
+    );
   }
 
   return (

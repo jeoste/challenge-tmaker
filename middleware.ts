@@ -40,11 +40,11 @@ export async function middleware(request: NextRequest) {
   const isAuthPage =
     request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/signup');
-  // /share and /dashboard require authentication
+  // /share requires authentication
+  // /dashboard requires authentication but logic is handled client-side to avoid redirect loops
   // /results is public (no account required per PRD)
   const isProtectedPage =
-    request.nextUrl.pathname.startsWith('/share') ||
-    request.nextUrl.pathname.startsWith('/dashboard');
+    request.nextUrl.pathname.startsWith('/share');
 
   if (isProtectedPage && !session) {
     const redirectUrl = new URL('/login', request.url);

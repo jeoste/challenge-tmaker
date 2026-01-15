@@ -60,12 +60,16 @@ export async function fetchRedditPosts(
 
 export function getSubredditsForNiche(niche: string): string[] {
     const mapping: Record<string, string[]> = {
-        'recruitment': ['recruitinghell', 'jobs', 'careerguidance', 'humanresources'],
-        'recrutement': ['recruitinghell', 'jobs', 'careerguidance', 'humanresources'], // French variant
-        'notion': ['Notion', 'productivity', 'selfhosted'],
-        'fitness': ['fitness', 'bodyweightfitness', 'nutrition', 'personaltraining'],
         'saas': ['SaaS', 'microsaas', 'startups', 'entrepreneur'],
-        'devtools': ['webdev', 'programming', 'SideProject', 'reactjs']
+        'crm': ['salesforce', 'sales', 'CRM', 'SaaS'],
+        'analytics': ['analytics', 'dataisbeautiful', 'BusinessIntelligence', 'SaaS'],
+        'automation': ['automation', 'zapier', 'n8n', 'SaaS'],
+        'devtools': ['webdev', 'programming', 'SideProject', 'reactjs'],
+        // Keep old mappings for backward compatibility
+        'recruitment': ['recruitinghell', 'jobs', 'careerguidance', 'humanresources'],
+        'recrutement': ['recruitinghell', 'jobs', 'careerguidance', 'humanresources'],
+        'notion': ['Notion', 'productivity', 'selfhosted'],
+        'fitness': ['fitness', 'bodyweightfitness', 'nutrition', 'personaltraining']
     };
     
     // Normalize niche to lowercase for lookup

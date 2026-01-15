@@ -54,6 +54,11 @@ SUPABASE_SERVICE_ROLE_KEY=...
 
 # App URL
 NEXT_PUBLIC_APP_URL=https://reddit-goldmine.vercel.app
+
+# IP Whitelist (optionnel - pour bypasser le rate limit lors des tests)
+# Format: IPv4 (ex: 192.168.1.1) ou IPv6 (ex: 2001:db8::1)
+IPV4_PUBLIC_TESTING=...
+IPV6_PUBLIC_TESTING=...
 ```
 
 ### Configuration par environnement

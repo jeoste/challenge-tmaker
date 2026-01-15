@@ -40,7 +40,7 @@ export const SearchBar = ({ onFocus, onBlur }: SearchBarProps) => {
             <Search className="w-5 h-5 text-muted-foreground shrink-0" />
             <input
               type="text"
-              placeholder='Type a niche (e.g. "Recruitment", "Notion")'
+              placeholder='Type a niche (e.g. "CRM", "Analytics", "SaaS")'
               className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none text-base"
               value={query}
               onChange={(e) => setQuery(e.target.value)}

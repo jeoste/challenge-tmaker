@@ -4,10 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 const niches = [
-  { name: "Notion", id: "notion" },
-  { name: "Fitness", id: "fitness" },
-  { name: "Recruitment", id: "recruitment" },
   { name: "SaaS", id: "saas" },
+  { name: "CRM", id: "crm" },
+  { name: "Analytics", id: "analytics" },
+  { name: "Automation", id: "automation" },
   { name: "Devtools", id: "devtools" },
 ];
 

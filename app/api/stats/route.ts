@@ -11,8 +11,7 @@ export async function GET() {
       try {
         cached = await redis.get(cacheKey);
       } catch (error) {
-        // Redis not available, continue without cache
-        console.warn('Redis not available, skipping cache');
+        // Redis not available, continue without cache (silent fallback)
       }
     }
     
@@ -33,24 +32,14 @@ export async function GET() {
         .gte('created_at', twentyFourHoursAgo.toISOString());
 
       if (error) {
-        // Table might not exist yet (migrations not run)
-        // Log but don't fail - return default value
-        if (error.code === 'PGRST205' || error.message?.includes('not found')) {
-          console.warn('scan_logs table not found - migrations may not be run yet');
-        } else {
-          console.error('Error fetching stats:', error);
-        }
+        // Table might not exist yet (migrations not run) or other issues:
+        // do not fail the UI, and do not spam logs.
         return NextResponse.json({ postsScanned24h: 0 });
       }
 
       totalPosts = data?.reduce((sum, log) => sum + (log.posts_found || 0), 0) || 0;
     } catch (err: any) {
-      // Handle any other errors gracefully
-      if (err.code === 'PGRST205' || err.message?.includes('not found')) {
-        console.warn('scan_logs table not found - migrations may not be run yet');
-      } else {
-        console.error('Error fetching stats:', err);
-      }
+      // Handle any other errors gracefully (silent fallback)
       return NextResponse.json({ postsScanned24h: 0 });
     }
 
@@ -59,14 +48,13 @@ export async function GET() {
       try {
         await redis.setex(cacheKey, 300, totalPosts.toString());
       } catch (error) {
-        // Redis not available, continue without caching
-        console.warn('Redis not available, skipping cache write');
+        // Redis not available, continue without caching (silent fallback)
       }
     }
 
     return NextResponse.json({ postsScanned24h: totalPosts });
   } catch (error) {
-    console.error('Stats API error:', error);
+    // Silent fallback: stats should never break pages.
     return NextResponse.json({ postsScanned24h: 0 });
   }
 }
