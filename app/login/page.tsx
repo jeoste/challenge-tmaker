@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { LoginForm } from '@/components/auth/LoginForm';
 
-export default function LoginPage() {
+function LoginContent() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
@@ -62,5 +62,17 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-canvas flex items-center justify-center">
+        <div className="text-muted-foreground">Chargement...</div>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }

@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
         const realIP = request.headers.get('x-real-ip');
         const cfConnectingIP = request.headers.get('cf-connecting-ip'); // Cloudflare
         const trueClientIP = request.headers.get('true-client-ip'); // Some proxies
-        
+
         const ip = forwardedFor?.split(',')[0]?.trim() ||
             realIP?.trim() ||
             cfConnectingIP?.trim() ||
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
         const rateLimitIdentifier = `user:${userId}`;
         console.log('[Rate Limit] Checking rate limit for identifier:', rateLimitIdentifier, 'plan:', userPlan, 'isWhitelisted:', ipWhitelisted);
         const rateLimit = await checkRateLimit(rateLimitIdentifier, ipWhitelisted, userPlan);
-        
+
         if (!rateLimit.allowed) {
             // Log for debugging
             const maxScans = userPlan === 'free' ? 3 : 5;
@@ -177,18 +177,18 @@ export async function POST(request: NextRequest) {
 
         // 3. Fetch Reddit data
         const subreddits = getSubredditsForNiche(niche);
-        
+
         // 3.1. Fetch from Reddit API directly (primary source)
         const postsResults = await Promise.all(
             subreddits.map(sub => fetchRedditPosts(sub, 'week'))
         );
         let posts = removeDuplicates(postsResults.flat());
-        
+
         // 3.0. Optionally enrich with RapidAPI (VERY limited quotas)
         // reddit3: 100/month (search posts, user data)
         // reddit34: 50/month (subreddit metadata)
-        const subredditMetadata: Record<string, { subscribers?: number; [key: string]: unknown }> = {};
-        
+        const subredditMetadata: Record<string, { subscribers?: number;[key: string]: unknown }> = {};
+
         // Check quota for reddit3 (search posts)
         const rapidApiRateLimitReddit3 = await checkRapidApiRateLimit(
             `rapidapi:user:${userId}`,
@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
             userPlan,
             'reddit3'
         );
-        
+
         if (rapidApiRateLimitReddit3.allowed && process.env.RAPID_API_KEY && subreddits.length > 0) {
             try {
                 // 3.0.1. Search posts using reddit3 (high-value operation)
@@ -208,7 +208,7 @@ export async function POST(request: NextRequest) {
                     'week',
                     'relevance'
                 );
-                
+
                 if (rapidApiPosts.length > 0) {
                     console.log(`[RapidAPI] Found ${rapidApiPosts.length} posts via reddit3 search`);
                     const convertedPosts = rapidApiPosts.map(rapidApiPostToRedditPost);
@@ -220,7 +220,7 @@ export async function POST(request: NextRequest) {
                         console.log(`[RapidAPI] Added ${newPosts.length} new posts from reddit3`);
                     }
                 }
-                
+
                 // 3.0.2. Get subreddit metadata using reddit34 (only if premium and quota allows)
                 // For free users, skip metadata to conserve quota for search
                 if (userPlan === 'premium') {
@@ -231,7 +231,7 @@ export async function POST(request: NextRequest) {
                         userPlan,
                         'reddit34'
                     );
-                    
+
                     if (rapidApiRateLimitReddit34.allowed) {
                         const subredditInfo = await getSubredditInfo(primarySubreddit);
                         if (subredditInfo) {
@@ -253,17 +253,17 @@ export async function POST(request: NextRequest) {
                 console.log(`[RapidAPI] Rate limit exceeded for reddit3. Remaining: ${rapidApiRateLimitReddit3.remaining}. Skipping RapidAPI enrichment.`);
             }
         }
-        
+
         // 3.2. Enrich with Serper API (if rate limit allows and API key is configured)
         const serperRateLimit = await checkSerperRateLimit(
             `serper:user:${userId}`,
             ipWhitelisted,
             userPlan
         );
-        
+
         if (serperRateLimit.allowed && process.env.SERPER_DEV_API_KEY) {
             console.log(`[Serper] Rate limit check passed. Remaining: ${serperRateLimit.remaining}`);
-            
+
             try {
                 // Search via Serper for each subreddit (limit to avoid quota exhaustion)
                 const serperSearches = subreddits.slice(0, 2).map(async (subreddit) => {
@@ -271,11 +271,11 @@ export async function POST(request: NextRequest) {
                     return serperResults.map(result => {
                         const partialPost = serperResultToRedditPost(result);
                         // Try to match with existing posts by URL
-                        const existingPost = posts.find(p => 
-                            p.permalink === partialPost.permalink || 
+                        const existingPost = posts.find(p =>
+                            p.permalink === partialPost.permalink ||
                             p.permalink?.includes(partialPost.id || '')
                         );
-                        
+
                         if (existingPost) {
                             // Merge snippet into existing post if it has more context
                             if (result.snippet && result.snippet.length > existingPost.selftext.length) {
@@ -283,13 +283,13 @@ export async function POST(request: NextRequest) {
                             }
                             return null; // Don't add duplicate
                         }
-                        
+
                         return partialPost;
-                    }).filter(Boolean);
+                    }).filter((post): post is RedditPost => post !== null);
                 });
-                
-                const serperPosts = (await Promise.all(serperSearches)).flat().filter(Boolean);
-                
+
+                const serperPosts = (await Promise.all(serperSearches)).flat();
+
                 // Add Serper posts to the collection
                 if (serperPosts.length > 0) {
                     console.log(`[Serper] Added ${serperPosts.length} additional posts from Serper`);
@@ -379,7 +379,7 @@ export async function POST(request: NextRequest) {
         // 7.5. Fallback: If LLM filtered everything, use top scored posts
         // Always ensure we have at least 1-3 results
         let filteredResults = rescored;
-        
+
         if (filteredResults.length === 0 && scored.length > 0) {
             console.warn(`[Fallback] LLM filtered all posts. Using top ${Math.min(3, scored.length)} posts by engagement score.`);
             // Use top posts by engagement (score + comments) from different subreddits
@@ -390,7 +390,7 @@ export async function POST(request: NextRequest) {
                 }
                 subredditGroups.get(post.subreddit)!.push(post);
             });
-            
+
             // Take top post from each subreddit, then fill with best overall
             const topBySubreddit: typeof scored = [];
             subredditGroups.forEach((posts) => {
@@ -401,20 +401,20 @@ export async function POST(request: NextRequest) {
                 })[0];
                 if (top) topBySubreddit.push(top);
             });
-            
+
             // Sort by engagement and take top 3
             const topByEngagement = scored.sort((a, b) => {
                 const aEng = (a.score * 1.0) + (a.num_comments * 3.0);
                 const bEng = (b.score * 1.0) + (b.num_comments * 3.0);
                 return bEng - aEng;
             });
-            
+
             // Combine: prioritize diversity (different subreddits), then best engagement
             const combined = [...topBySubreddit, ...topByEngagement];
-            const unique = combined.filter((post, index, self) => 
+            const unique = combined.filter((post, index, self) =>
                 index === self.findIndex(p => p.id === post.id)
             );
-            
+
             filteredResults = unique.slice(0, 3).map(post => ({
                 ...post,
                 isOpportunity: true,
@@ -422,7 +422,7 @@ export async function POST(request: NextRequest) {
                 goldScore: Math.round(calculateGoldScore(post, 1.0)),
                 postsCount: post.similarPostsCount || 1
             }));
-            
+
             console.log(`[Fallback] Selected ${filteredResults.length} posts from ${subredditGroups.size} subreddits`);
         }
 
@@ -432,7 +432,7 @@ export async function POST(request: NextRequest) {
             const beforeFilter = filteredResults.length;
             filteredResults = filteredResults.filter(post => post.goldScore < 80);
             console.log(`[Plan] Free plan: Filtered ${beforeFilter} results to ${filteredResults.length} (score < 80)`);
-            
+
             // If free plan filtered everything, still return at least 1 result
             if (filteredResults.length === 0 && beforeFilter > 0) {
                 console.warn(`[Plan] Free plan filtered all results. Returning top result anyway.`);
@@ -445,7 +445,7 @@ export async function POST(request: NextRequest) {
                 }
             }
         }
-        
+
         // 7.7. Ensure we always have at least 1 result (minimum viable response)
         if (filteredResults.length === 0 && scored.length > 0) {
             console.warn(`[Fallback] No results after all filters. Using top post by engagement.`);
@@ -454,7 +454,7 @@ export async function POST(request: NextRequest) {
                 const bEng = (b.score * 1.0) + (b.num_comments * 3.0);
                 return bEng - aEng;
             })[0];
-            
+
             if (topPost) {
                 filteredResults = [{
                     ...topPost,
@@ -469,50 +469,50 @@ export async function POST(request: NextRequest) {
         // 8. Generate blueprints with rate limiting and serialization
         // Check Gemini rate limits to determine how many blueprints we can generate
         const geminiRateLimit = await checkGeminiRateLimit();
-        
+
         // Calculate max results based on rate limits and user plan
         let maxResults = userPlan === 'free' ? 3 : 10;
-        
+
         // Reduce maxResults if we're approaching daily limit (leave 20% margin)
         if (geminiRateLimit.rpd.remaining < 20) {
             maxResults = Math.min(maxResults, Math.floor(geminiRateLimit.rpd.remaining * 0.8));
             console.log(`[Gemini Rate Limit] Reduced maxResults to ${maxResults} due to low daily quota (${geminiRateLimit.rpd.remaining} remaining)`);
         }
-        
+
         // Further reduce if we're approaching per-minute limit
         if (geminiRateLimit.rpm.remaining < 3) {
             maxResults = Math.min(maxResults, geminiRateLimit.rpm.remaining);
             console.log(`[Gemini Rate Limit] Reduced maxResults to ${maxResults} due to low per-minute quota (${geminiRateLimit.rpm.remaining} remaining)`);
         }
-        
+
         const topResults = filteredResults.slice(0, maxResults);
         console.log(`[Plan] Generating ${topResults.length} blueprints for ${userPlan} plan (RPM: ${geminiRateLimit.rpm.remaining}, RPD: ${geminiRateLimit.rpd.remaining})`);
-        
+
         // Serialize blueprint generation with delays to respect rate limits
         // Delay between calls: 12 seconds (to stay under 5 RPM = 1 call per 12 seconds)
         const DELAY_BETWEEN_CALLS_MS = 12000; // 12 seconds = 5 calls per minute
-        
+
         const pains = [];
         for (let index = 0; index < topResults.length; index++) {
             const post = topResults[index];
-            
+
             // Check rate limit before each call
             const currentRateLimit = await checkGeminiRateLimit();
             if (!currentRateLimit.allowed) {
                 console.warn(`[Gemini Rate Limit] Stopping blueprint generation at index ${index}/${topResults.length} due to rate limit`);
                 break;
             }
-            
+
             try {
                 const blueprint = await generateBlueprint(post);
-                
+
                 // Build Reddit URL from permalink
-                const redditUrl = post.permalink 
-                    ? (post.permalink.startsWith('http') 
-                        ? post.permalink 
+                const redditUrl = post.permalink
+                    ? (post.permalink.startsWith('http')
+                        ? post.permalink
                         : `https://www.reddit.com${post.permalink}`)
                     : undefined;
-                
+
                 pains.push({
                     id: `pain-${index}-${Date.now()}`,
                     title: post.title,
@@ -523,7 +523,7 @@ export async function POST(request: NextRequest) {
                     permalink: redditUrl,
                     blueprint
                 });
-                
+
                 // Wait before next call (except for the last one)
                 if (index < topResults.length - 1) {
                     console.log(`[Gemini Rate Limit] Waiting ${DELAY_BETWEEN_CALLS_MS}ms before next blueprint generation...`);
@@ -538,9 +538,9 @@ export async function POST(request: NextRequest) {
                     break;
                 }
                 // For other errors, continue with fallback blueprint
-                const redditUrl = post.permalink 
-                    ? (post.permalink.startsWith('http') 
-                        ? post.permalink 
+                const redditUrl = post.permalink
+                    ? (post.permalink.startsWith('http')
+                        ? post.permalink
                         : `https://www.reddit.com${post.permalink}`)
                     : undefined;
                 pains.push({

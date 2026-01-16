@@ -31,50 +31,27 @@ export async function POST(request: NextRequest) {
                    'http://localhost:3000';
 
     // Create checkout session
-    // Polar.sh supports both variantId (for product variants) and productId
-    // We'll try variantId first, then fallback to productId if needed
-    let checkout;
-    try {
-      checkout = await polar.checkouts.create({
-        variantId: variantId,
-        customerEmail: session.user.email!,
-        customerName: session.user.user_metadata?.full_name || undefined,
-        successUrl: `${baseUrl}/pricing/success?checkout_id={CHECKOUT_ID}`,
-        cancelUrl: `${baseUrl}/pricing?canceled=true`,
-        metadata: {
-          user_id: session.user.id,
-          plan: 'monthly',
-        },
-      });
-    } catch (error: unknown) {
-      // If variantId fails, try with productId instead
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorStatus = (error as { status?: number })?.status;
-      if (errorMessage.includes('variant') || errorStatus === 404) {
-        checkout = await polar.checkouts.create({
-          productId: variantId,
-          customerEmail: session.user.email!,
-          customerName: session.user.user_metadata?.full_name || undefined,
-          successUrl: `${baseUrl}/pricing/success?checkout_id={CHECKOUT_ID}`,
-          cancelUrl: `${baseUrl}/pricing?canceled=true`,
-          metadata: {
-            user_id: session.user.id,
-            plan: 'monthly',
-          },
-        });
-      } else {
-        throw error;
-      }
-    }
+    // Polar.sh uses products array for checkout creation
+    const checkout = await polar.checkouts.create({
+      products: [variantId],
+      customerEmail: session.user.email!,
+      customerName: session.user.user_metadata?.full_name || undefined,
+      successUrl: `${baseUrl}/pricing/success?checkout_id={CHECKOUT_ID}`,
+      metadata: {
+        user_id: session.user.id,
+        plan: 'monthly',
+      },
+    });
 
     return NextResponse.json({ 
       checkoutUrl: checkout.url,
       checkoutId: checkout.id,
     });
   } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create checkout session';
     console.error('[Polar Checkout] Error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to create checkout session' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

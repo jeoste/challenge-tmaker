@@ -22,6 +22,7 @@ export interface SubredditInfo {
   createdUtc?: number;
   over18?: boolean;
   subredditType?: string;
+  [key: string]: unknown;
 }
 
 export interface RapidApiRedditPost {
@@ -76,7 +77,7 @@ export async function searchRedditPosts(
   sortType: 'relevance' | 'hot' | 'top' | 'new' | 'comments' = 'relevance'
 ): Promise<RapidApiRedditPost[]> {
   const apiKey = process.env.RAPID_API_KEY;
-  
+
   if (!apiKey) {
     console.warn('[RapidAPI] RAPID_API_KEY not configured. Skipping RapidAPI search.');
     return [];
@@ -104,14 +105,14 @@ export async function searchRedditPosts(
         console.warn('[RapidAPI] Quota exceeded or payment required. Skipping RapidAPI search.');
         return [];
       }
-      
+
       const errorText = await response.text();
       console.error(`[RapidAPI] Search API error: ${response.status} - ${errorText}`);
       return [];
     }
 
     const data = await response.json();
-    
+
     // Parse the response (structure may vary)
     interface RapidApiPost {
       id?: string;
@@ -166,7 +167,7 @@ export async function getRedditUserData(
   sortType: 'new' | 'top' | 'hot' = 'new'
 ): Promise<RedditUserData | null> {
   const apiKey = process.env.RAPID_API_KEY;
-  
+
   if (!apiKey) {
     console.warn('[RapidAPI] RAPID_API_KEY not configured. Skipping RapidAPI user data call.');
     return null;
@@ -192,14 +193,14 @@ export async function getRedditUserData(
         console.warn('[RapidAPI] Quota exceeded or payment required. Skipping RapidAPI user data call.');
         return null;
       }
-      
+
       const errorText = await response.text();
       console.error(`[RapidAPI] User data API error: ${response.status} - ${errorText}`);
       return null;
     }
 
     const data = await response.json();
-    
+
     // Parse the response (structure may vary)
     if (data && data.data) {
       const userData = data.data;
@@ -267,7 +268,7 @@ export async function getRedditUserData(
           subreddit: post.subreddit || '',
           permalink: post.permalink || post.url || '',
           url: post.url,
-          author: post.author || username,
+          author: username,
         }));
       }
 
@@ -290,7 +291,7 @@ export async function getRedditUserData(
  */
 export async function getSubredditInfo(subreddit: string): Promise<SubredditInfo | null> {
   const apiKey = process.env.RAPID_API_KEY;
-  
+
   if (!apiKey) {
     console.warn('[RapidAPI] RAPID_API_KEY not configured. Skipping RapidAPI call.');
     return null;
@@ -314,14 +315,14 @@ export async function getSubredditInfo(subreddit: string): Promise<SubredditInfo
         console.warn('[RapidAPI] Quota exceeded or payment required. Skipping RapidAPI call.');
         return null;
       }
-      
+
       const errorText = await response.text();
       console.error(`[RapidAPI] API error: ${response.status} - ${errorText}`);
       return null;
     }
 
     const data = await response.json();
-    
+
     // Parse the response (structure may vary)
     if (data && data.data) {
       const subredditData = data.data;
@@ -357,20 +358,20 @@ export async function getMultipleSubredditInfo(
   subreddits: string[]
 ): Promise<Map<string, SubredditInfo>> {
   const results = new Map<string, SubredditInfo>();
-  
+
   // Limit to top 3 subreddits to conserve quota
   const limitedSubreddits = subreddits.slice(0, 3);
-  
+
   for (const subreddit of limitedSubreddits) {
     const info = await getSubredditInfo(subreddit);
     if (info) {
       results.set(subreddit, info);
     }
-    
+
     // Small delay between requests
     await new Promise(resolve => setTimeout(resolve, 500));
   }
-  
+
   return results;
 }
 

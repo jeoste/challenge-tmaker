@@ -85,7 +85,7 @@ export const Pricing = () => {
       }
     } catch (error: unknown) {
       console.error('Error creating checkout:', error);
-      toast.error(error.message || 'Failed to start checkout process');
+      toast.error(error instanceof Error ? error.message : 'Failed to start checkout process');
       setLoading(false);
     }
   };

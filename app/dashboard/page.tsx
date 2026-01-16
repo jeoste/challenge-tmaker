@@ -96,8 +96,8 @@ export default function DashboardPage() {
       const data = await response.json();
       // Deduplicate analyses by ID to prevent duplicates
       const uniqueAnalyses = Array.from(
-        new Map((data.analyses || []).map((a: Analysis) => [a.id, a])).values()
-      );
+        new Map(((data.analyses || []) as Analysis[]).map((a: Analysis) => [a.id, a])).values()
+      ) as Analysis[];
       setAnalyses(uniqueAnalyses);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';

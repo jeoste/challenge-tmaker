@@ -1,17 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
-export default function PricingSuccessPage() {
+function PricingSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const checkoutId = searchParams.get("checkout_id");
   const [loading, setLoading] = useState(true);
-  const [, setError] = useState<string | null>(null);
+  const [error] = useState<string | null>(null);
 
   useEffect(() => {
     // Give Polar a moment to process the webhook
@@ -89,5 +89,25 @@ export default function PricingSuccessPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function PricingSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-mesh bg-grid">
+        <Header />
+        <main className="flex items-center justify-center min-h-[calc(100vh-80px)] px-6">
+          <div className="max-w-md w-full glass-card p-8 text-center">
+            <Loader2 className="w-16 h-16 text-primary mx-auto mb-4 animate-spin" />
+            <h1 className="text-2xl font-semibold text-foreground mb-2">
+              Chargement...
+            </h1>
+          </div>
+        </main>
+      </div>
+    }>
+      <PricingSuccessContent />
+    </Suspense>
   );
 }

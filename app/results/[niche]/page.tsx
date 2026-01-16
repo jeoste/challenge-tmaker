@@ -323,7 +323,7 @@ export default function ResultsPage() {
                   } catch (err: unknown) {
                     console.error('Error retrying fetch:', err);
                     setError('Erreur de connexion');
-                    setErrorDetails(err.message || 'Impossible de se connecter au serveur.');
+                    setErrorDetails(err instanceof Error ? err.message : 'Impossible de se connecter au serveur.');
                     setLoading(false);
                   }
                 }}
@@ -458,7 +458,7 @@ export default function ResultsPage() {
                       }
                     } catch (err: unknown) {
                       setError('Erreur de connexion');
-                      setErrorDetails(err.message || 'Impossible de se connecter au serveur.');
+                      setErrorDetails(err instanceof Error ? err.message : 'Impossible de se connecter au serveur.');
                     } finally {
                       setLoading(false);
                     }
