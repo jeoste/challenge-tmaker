@@ -58,7 +58,7 @@ export default function SharePage() {
           <h2 className="text-2xl font-bold text-foreground mb-4">
             Share non trouvé
           </h2>
-          <Button onClick={() => router.push('/')}>Retour à l'accueil</Button>
+          <Button onClick={() => router.push('/')}>Retour à l&apos;accueil</Button>
         </div>
       </div>
     );
@@ -78,7 +78,7 @@ export default function SharePage() {
           <h2 className="text-2xl font-bold text-foreground mb-4">
             Aucune donnée disponible
           </h2>
-          <Button onClick={() => router.push('/')}>Retour à l'accueil</Button>
+          <Button onClick={() => router.push('/')}>Retour à l&apos;accueil</Button>
         </div>
       </div>
     );

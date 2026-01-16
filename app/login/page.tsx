@@ -56,7 +56,7 @@ export default function LoginPage() {
               href="/signup"
               className="text-primary hover:underline"
             >
-              S'inscrire
+              S&apos;inscrire
             </Link>
           </div>
         </div>

@@ -309,7 +309,6 @@ Respond ONLY in valid JSON, no markdown, no text before or after.`;
         // Use Gemini 2.0 Flash Thinking for blueprint generation (better reasoning)
         // Fallback to Gemini 1.5 Flash if thinking model fails
         let text: string = '';
-        let modelUsed = 'models/gemini-2.0-flash-thinking-exp';
 
         // List of models to try in order (with correct v1beta format)
         // Priority: Gemini 2.0 Flash Thinking (best reasoning) -> Gemini 1.5 Flash (fallback)

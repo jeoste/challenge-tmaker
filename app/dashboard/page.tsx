@@ -183,7 +183,7 @@ export default function DashboardPage() {
     const totalOpportunities = analyses.reduce((sum, a) => sum + (a.pains?.length || 0), 0);
     const totalFavorites = favorites.length;
     const avgScore = analyses.reduce((sum, a) => {
-      const scores = a.pains?.map((p: any) => p.goldScore || 0) || [];
+      const scores = a.pains?.map((p: PainPoint) => p.goldScore || 0) || [];
       const avg = scores.length > 0 ? scores.reduce((s: number, v: number) => s + v, 0) / scores.length : 0;
       return sum + avg;
     }, 0) / (totalAnalyses || 1);

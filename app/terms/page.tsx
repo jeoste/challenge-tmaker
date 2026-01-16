@@ -130,7 +130,7 @@ export default function TermsPage() {
             <section>
               <h2 className="text-2xl font-semibold text-foreground mb-4">10. Changes to Terms</h2>
               <p className="text-muted-foreground leading-relaxed">
-                We reserve the right to modify these Terms of Service at any time. We will notify users of any material changes by posting the new Terms of Service on this page and updating the "Last updated" date. Your continued use of the Service after such changes constitutes acceptance of the new terms.
+                We reserve the right to modify these Terms of Service at any time. We will notify users of any material changes by posting the new Terms of Service on this page and updating the &quot;Last updated&quot; date. Your continued use of the Service after such changes constitutes acceptance of the new terms.
               </p>
             </section>
 
