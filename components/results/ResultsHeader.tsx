@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -12,7 +12,20 @@ interface ResultsHeaderProps {
 
 export function ResultsHeader({ niche }: ResultsHeaderProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
+  
+  // Check if we came from dashboard (has analysisId in query params)
+  const analysisId = searchParams.get('id');
+  const fromDashboard = !!analysisId;
+
+  const handleBack = () => {
+    if (fromDashboard) {
+      router.push('/dashboard');
+    } else {
+      router.push('/');
+    }
+  };
 
   return (
     <div className="flex items-center justify-between mb-8">
@@ -20,7 +33,7 @@ export function ResultsHeader({ niche }: ResultsHeaderProps) {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => router.push('/')}
+          onClick={handleBack}
           className="hover:bg-secondary"
         >
           <ArrowLeft className="h-5 w-5" />

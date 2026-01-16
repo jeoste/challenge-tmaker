@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
 
     // Deduplicate analyses: prioritize analyses with pain points, then most recent
     interface Analysis {
+      id: string;
       user_id: string;
       niche: string;
       scanned_at: string;
@@ -122,7 +123,7 @@ export async function GET(request: NextRequest) {
     );
 
     console.log(`[Dashboard API] After deduplication: ${uniqueAnalyses.length} unique analyses`);
-    uniqueAnalyses.forEach((analysis: { id: string; niche: string; scanned_at: string; pains?: unknown[] }) => {
+    uniqueAnalyses.forEach((analysis: Analysis) => {
       const painsCount = Array.isArray(analysis.pains) ? analysis.pains.length : 0;
       console.log(`  - ID: ${analysis.id}, niche: "${analysis.niche}", scanned_at: ${analysis.scanned_at}, pains: ${painsCount}`);
     });
