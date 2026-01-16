@@ -94,16 +94,26 @@ export default function DashboardPage() {
       }
 
       const data = await response.json();
+      console.log('[Dashboard] Received analyses from API:', data.analyses?.length || 0);
+      if (data.analyses && data.analyses.length > 0) {
+        data.analyses.forEach((a: Analysis) => {
+          console.log(`[Dashboard] Analysis: id=${a.id}, niche="${a.niche}", pains=${a.pains?.length || 0}, scanned_at=${a.scanned_at}`);
+        });
+      }
+      
       // Deduplicate analyses by ID to prevent duplicates
       const uniqueAnalyses = Array.from(
         new Map(((data.analyses || []) as Analysis[]).map((a: Analysis) => [a.id, a])).values()
       ) as Analysis[];
+      console.log('[Dashboard] After deduplication:', uniqueAnalyses.length, 'analyses');
       setAnalyses(uniqueAnalyses);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
       console.error('Error fetching analyses:', err);
       setError(errorMessage);
       setAnalyses([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -269,12 +279,28 @@ export default function DashboardPage() {
                   Usage metrics and your ideas history
                 </p>
               </div>
-              <Link href="/">
-                <Button variant="outline" className="flex items-center gap-2">
-                  <ArrowLeft className="h-4 w-4" />
-                  Home
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setLoading(true);
+                    fetchAnalyses();
+                    fetchFavorites();
+                  }}
+                  className="flex items-center gap-2"
+                  disabled={loading}
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  Refresh
                 </Button>
-              </Link>
+                <Link href="/">
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <ArrowLeft className="h-4 w-4" />
+                    Home
+                  </Button>
+                </Link>
+              </div>
             </div>
 
             {error && (
@@ -447,7 +473,7 @@ export default function DashboardPage() {
                             <div className="flex-1">
                               <div className="flex items-center gap-3 mb-3">
                                 <h3 className="text-xl font-bold text-foreground">
-                                  {analysis.niche}
+                                  Analysis: {analysis.niche}
                                 </h3>
                                 <Badge variant="outline" className="flex items-center gap-1">
                                   <Calendar className="h-3 w-3" />
@@ -457,17 +483,35 @@ export default function DashboardPage() {
                                     year: 'numeric',
                                   })}
                                 </Badge>
+                                {analysis.pains && analysis.pains.length > 0 && (
+                                  <Badge variant="default" className="flex items-center gap-1 bg-primary/10 text-primary border-primary/20">
+                                    <Sparkles className="h-3 w-3" />
+                                    {analysis.pains.length} {analysis.pains.length === 1 ? 'opportunity' : 'opportunities'}
+                                  </Badge>
+                                )}
                               </div>
                               <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
                                 <span className="flex items-center gap-1">
                                   <FileText className="h-4 w-4" />
-                                  {analysis.total_posts} posts
+                                  {analysis.total_posts} {analysis.total_posts === 1 ? 'post scanned' : 'posts scanned'}
                                 </span>
-                                <span>•</span>
-                                <span className="flex items-center gap-1">
-                                  <Target className="h-4 w-4" />
-                                  {analysis.pains?.length || 0} opportunities
-                                </span>
+                                {analysis.pains && analysis.pains.length > 0 ? (
+                                  <>
+                                    <span>•</span>
+                                    <span className="flex items-center gap-1 text-primary">
+                                      <Target className="h-4 w-4" />
+                                      {analysis.pains.length} {analysis.pains.length === 1 ? 'SaaS opportunity found' : 'SaaS opportunities found'}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span>•</span>
+                                    <span className="flex items-center gap-1 text-muted-foreground">
+                                      <Target className="h-4 w-4" />
+                                      No opportunities found
+                                    </span>
+                                  </>
+                                )}
                               </div>
                             </div>
                             <div className="flex gap-2 ml-4">
@@ -521,14 +565,14 @@ export default function DashboardPage() {
                               <div className="flex-1">
                                 <div className="flex items-center gap-3 mb-2">
                                   <h3 className="text-lg font-bold text-foreground">
-                                    {item.painPoint.blueprint?.solutionName || item.painPoint.title}
+                                    {item.painPoint.blueprint?.solutionName || `Opportunity: ${item.painPoint.title}`}
                                   </h3>
                                   <Badge variant="outline" className="text-xs">
                                     {item.analysis.niche}
                                   </Badge>
                                 </div>
                                 <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                                  {item.painPoint.blueprint?.problem || item.painPoint.title}
+                                  <span className="font-medium">Problem:</span> {item.painPoint.blueprint?.problem || item.painPoint.title}
                                 </p>
                                 <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
                                   {item.painPoint.blueprint?.marketSize && (
@@ -609,7 +653,7 @@ export default function DashboardPage() {
                                 <div className="flex items-center gap-3 mb-2">
                                   <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
                                   <h3 className="text-lg font-bold text-foreground">
-                                    {painPoint.blueprint?.solutionName || painPoint.title}
+                                    {painPoint.blueprint?.solutionName || `Favorite: ${painPoint.title}`}
                                   </h3>
                                   {analysis && (
                                     <Badge variant="outline" className="text-xs">
@@ -618,7 +662,7 @@ export default function DashboardPage() {
                                   )}
                                 </div>
                                 <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                                  {painPoint.blueprint?.problem || painPoint.title}
+                                  <span className="font-medium">Problem:</span> {painPoint.blueprint?.problem || painPoint.title}
                                 </p>
                                 <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
                                   {painPoint.blueprint?.marketSize && (

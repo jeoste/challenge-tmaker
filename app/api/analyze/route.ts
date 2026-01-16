@@ -307,7 +307,7 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // 4. Quick filter
+        // 4. Quick filter - strict filtering for pain points only
         const filtered = posts.filter(quickFilter);
 
         // 4.5. Group similar posts for counting
@@ -360,7 +360,17 @@ export async function POST(request: NextRequest) {
         // 6. LLM batch analysis
         let llmFiltered: Array<RedditPost & { relevanceScore: number; isOpportunity: boolean; similarPostsCount?: number }> = [];
         if (scored.length > 0) {
-            llmFiltered = await batchLLMAnalysis(scored);
+            try {
+                llmFiltered = await batchLLMAnalysis(scored);
+            } catch (error) {
+                console.warn('[LLM] LLM analysis failed, using fallback:', error);
+                // Fallback: consider all posts as opportunities
+                llmFiltered = scored.map(post => ({
+                    ...post,
+                    isOpportunity: true,
+                    relevanceScore: 1.0
+                }));
+            }
         } else {
             // Fallback if no posts pass filters - maybe try unfiltered top posts?
             // or just return empty result
@@ -446,25 +456,8 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // 7.7. Ensure we always have at least 1 result (minimum viable response)
-        if (filteredResults.length === 0 && scored.length > 0) {
-            console.warn(`[Fallback] No results after all filters. Using top post by engagement.`);
-            const topPost = scored.sort((a, b) => {
-                const aEng = (a.score * 1.0) + (a.num_comments * 3.0);
-                const bEng = (b.score * 1.0) + (b.num_comments * 3.0);
-                return bEng - aEng;
-            })[0];
-
-            if (topPost) {
-                filteredResults = [{
-                    ...topPost,
-                    isOpportunity: true,
-                    relevanceScore: 1.0,
-                    goldScore: Math.round(calculateGoldScore(topPost, 1.0)),
-                    postsCount: topPost.similarPostsCount || 1
-                }];
-            }
-        }
+        // No fallback - if no posts pass all filters, return empty results
+        // This is expected behavior for niches without pain points
 
         // 8. Generate blueprints with rate limiting and serialization
         // Check Gemini rate limits to determine how many blueprints we can generate
@@ -588,6 +581,13 @@ export async function POST(request: NextRequest) {
 
         // 10. Save to Supabase (optional - don't fail if table doesn't exist)
         let analysisData = null;
+        
+        // Log what we're about to save
+        console.log(`[Save] Saving analysis to database: niche="${niche}", total_posts=${posts.length}, pains_count=${pains.length}`);
+        if (pains.length === 0) {
+            console.warn(`[Save] ⚠️ Warning: Saving analysis with 0 pain points for niche "${niche}"`);
+        }
+        
         const { data, error: analysisError } = await supabaseAdmin
             .from('reddit_analyses')
             .insert({
@@ -626,6 +626,12 @@ export async function POST(request: NextRequest) {
             analysisData = null;
         } else {
             analysisData = data;
+            // Verify what was actually saved
+            const savedPainsCount = Array.isArray(data.pains) ? data.pains.length : 0;
+            console.log(`[Save] ✅ Analysis saved with ID: ${data.id}, pains_count in DB: ${savedPainsCount}`);
+            if (savedPainsCount !== pains.length) {
+                console.error(`[Save] ❌ MISMATCH: Tried to save ${pains.length} pain points but ${savedPainsCount} were saved!`);
+            }
         }
 
         // 11. Log metrics (only if table exists)

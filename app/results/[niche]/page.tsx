@@ -98,6 +98,7 @@ export default function ResultsPage() {
 
         // If analysisId is provided, fetch that specific analysis
         if (analysisId) {
+          console.log('Fetching analysis by ID:', analysisId, 'for niche:', niche);
           const analysisResponse = await fetch(
             `/api/analyze/id/${analysisId}`,
             {
@@ -111,12 +112,31 @@ export default function ResultsPage() {
             const analysisData = await analysisResponse.json();
             setData(analysisData);
             setLoading(false);
-            console.log('Using analysis from ID:', analysisId);
+            console.log('✅ Using analysis from ID:', analysisId, 'with', analysisData.pains?.length || 0, 'pain points');
+            return;
+          } else {
+            // If we have an analysisId but the fetch failed, don't create a new analysis
+            const errorText = await analysisResponse.text();
+            console.warn('❌ Failed to fetch analysis by ID:', analysisId, 'Status:', analysisResponse.status, 'Response:', errorText);
+            
+            if (analysisResponse.status === 404) {
+              setError('Analysis not found');
+              setErrorDetails('The requested analysis could not be found. It may have been deleted.');
+            } else if (analysisResponse.status === 401) {
+              setError('Authentication required');
+              setErrorDetails('You must be logged in to view this analysis.');
+              setTimeout(() => router.push('/login'), 2000);
+            } else {
+              setError('Error loading analysis');
+              setErrorDetails('Failed to load the analysis. Please try again later.');
+            }
+            setLoading(false);
             return;
           }
         }
 
         // Otherwise, try to fetch existing analysis from database by niche
+        console.log('Fetching existing analysis by niche:', niche);
         const existingAnalysisResponse = await fetch(
           `/api/analyze/${encodeURIComponent(niche)}`,
           {
@@ -131,8 +151,11 @@ export default function ResultsPage() {
           const existingData = await existingAnalysisResponse.json();
           setData(existingData);
           setLoading(false);
-          console.log('Using existing analysis from database:', existingData.id);
+          console.log('✅ Using existing analysis from database:', existingData.id, 'with', existingData.pains?.length || 0, 'pain points');
           return;
+        } else {
+          const errorText = await existingAnalysisResponse.text();
+          console.warn('❌ No existing analysis found for niche:', niche, 'Status:', existingAnalysisResponse.status, 'Response:', errorText);
         }
 
         // If analysis doesn't exist (404), create a new one
@@ -142,6 +165,8 @@ export default function ResultsPage() {
           console.warn('Error fetching existing analysis:', errorData);
           // Continue to create new analysis
         }
+
+        console.log('🔄 Creating new analysis for niche:', niche);
 
         // Create new analysis with query params
         interface RequestBody {
@@ -222,7 +247,7 @@ export default function ResultsPage() {
     };
 
     fetchResults();
-  }, [niche, router, session?.access_token, authLoading]);
+  }, [niche, analysisId, router, session?.access_token, authLoading]);
 
   if (loading) {
     return (

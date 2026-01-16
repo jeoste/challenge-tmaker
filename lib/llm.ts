@@ -83,7 +83,6 @@ IMPORTANT - PRIORITIZATION:
 1. PRIORITIZE VIRAL posts with many likes (high score) and comments (high engagement)
 2. PRIORITIZE posts that generate DISCUSSION (many comments = validated need)
 3. DIVERSIFY results across different subreddits (don't take everything from a single subreddit)
-4. You MUST identify AT LEAST 3 valid opportunities among these posts
 
 CRITERIA for a valid opportunity:
 ✅ User expresses a NEED or PROBLEM that can be solved by a SaaS
@@ -98,7 +97,7 @@ ALSO ACCEPT:
 - Posts describing a recurring problem (SaaS opportunity)
 - Posts with legitimate complaints about existing tools (improvement opportunity)
 
-❌ REJECT ONLY if:
+❌ REJECT if:
 - It's clearly a security warning without business context
 - It's only a technical tutorial without demand
 - It's a project/launch announcement without need context

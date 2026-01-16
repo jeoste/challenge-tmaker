@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch user's analyses, ordered by most recent first
+    console.log(`[Dashboard API] Fetching analyses for user ${userId}`);
     const { data, error } = await supabaseAdmin
       .from('reddit_analyses')
       .select('*')
@@ -43,11 +44,12 @@ export async function GET(request: NextRequest) {
       // If migrations haven't been run yet, PostgREST typically returns PGRST205 / "not found".
       // In that case (and to avoid blocking the dashboard), return an empty list with 200.
       if (error.code === 'PGRST205' || error.message?.toLowerCase().includes('not found')) {
+        console.log(`[Dashboard API] Table not found for user ${userId}`);
         return NextResponse.json({ analyses: [] });
       }
 
       // For unexpected errors, keep a 500 (the client already renders an error state).
-      console.error('Error fetching analyses:', error);
+      console.error('[Dashboard API] Error fetching analyses:', error);
       return NextResponse.json(
         {
           error: 'Error fetching analyses',
@@ -59,29 +61,71 @@ export async function GET(request: NextRequest) {
     }
 
     if (!data || data.length === 0) {
-      console.log(`No analyses found for user ${userId}`);
+      console.log(`[Dashboard API] No analyses found for user ${userId}`);
       return NextResponse.json({ analyses: [] });
     }
 
-    // Deduplicate analyses: keep only the most recent one for each (user_id, niche) combination
+    // Log each analysis found
+    console.log(`[Dashboard API] Found ${data.length} raw analyses for user ${userId}:`);
+    data.forEach((analysis: { id: string; niche: string; scanned_at: string; pains?: unknown[] }) => {
+      const painsCount = Array.isArray(analysis.pains) ? analysis.pains.length : 0;
+      console.log(`  - ID: ${analysis.id}, niche: "${analysis.niche}", scanned_at: ${analysis.scanned_at}, pains: ${painsCount}`);
+    });
+
+    // Deduplicate analyses: prioritize analyses with pain points, then most recent
     interface Analysis {
       user_id: string;
       niche: string;
       scanned_at: string;
+      pains?: unknown[];
       [key: string]: unknown;
     }
-    const uniqueAnalyses = Array.from(
-      new Map(
-        data.map((analysis: Analysis) => [
-          `${analysis.user_id}-${analysis.niche.toLowerCase().trim()}`,
-          analysis
-        ])
-      ).values()
-    ).sort((a: Analysis, b: Analysis) => 
+    
+    // Group by niche and select the best one for each niche
+    const analysesByNiche = new Map<string, Analysis>();
+    
+    data.forEach((analysis: Analysis) => {
+      const nicheKey = `${analysis.user_id}-${analysis.niche.toLowerCase().trim()}`;
+      const existing = analysesByNiche.get(nicheKey);
+      const currentPainsCount = Array.isArray(analysis.pains) ? analysis.pains.length : 0;
+      const existingPainsCount = existing && Array.isArray(existing.pains) ? existing.pains.length : 0;
+      
+      if (!existing) {
+        // First analysis for this niche
+        analysesByNiche.set(nicheKey, analysis);
+      } else {
+        // Prefer analysis with pain points, or most recent if both have same pain count
+        if (currentPainsCount > existingPainsCount) {
+          // Current has more pain points, prefer it
+          analysesByNiche.set(nicheKey, analysis);
+        } else if (currentPainsCount === existingPainsCount && currentPainsCount > 0) {
+          // Both have pain points, prefer most recent
+          const currentDate = new Date(analysis.scanned_at).getTime();
+          const existingDate = new Date(existing.scanned_at).getTime();
+          if (currentDate > existingDate) {
+            analysesByNiche.set(nicheKey, analysis);
+          }
+        } else if (currentPainsCount === 0 && existingPainsCount === 0) {
+          // Both have no pain points, prefer most recent
+          const currentDate = new Date(analysis.scanned_at).getTime();
+          const existingDate = new Date(existing.scanned_at).getTime();
+          if (currentDate > existingDate) {
+            analysesByNiche.set(nicheKey, analysis);
+          }
+        }
+        // If existing has more pain points, keep it
+      }
+    });
+    
+    const uniqueAnalyses = Array.from(analysesByNiche.values()).sort((a: Analysis, b: Analysis) => 
       new Date(b.scanned_at).getTime() - new Date(a.scanned_at).getTime()
     );
 
-    console.log(`Found ${data.length} analyses for user ${userId}, ${uniqueAnalyses.length} unique after deduplication`);
+    console.log(`[Dashboard API] After deduplication: ${uniqueAnalyses.length} unique analyses`);
+    uniqueAnalyses.forEach((analysis: { id: string; niche: string; scanned_at: string; pains?: unknown[] }) => {
+      const painsCount = Array.isArray(analysis.pains) ? analysis.pains.length : 0;
+      console.log(`  - ID: ${analysis.id}, niche: "${analysis.niche}", scanned_at: ${analysis.scanned_at}, pains: ${painsCount}`);
+    });
 
     return NextResponse.json({ analyses: uniqueAnalyses });
   } catch (error) {

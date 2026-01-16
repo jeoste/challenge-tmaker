@@ -13,6 +13,8 @@ export const metadata: Metadata = {
   title: "Unearth - Find Reddit-Validated SaaS Ideas",
   description:
     "Automatically scans Reddit pain points and generates ready-to-launch micro-SaaS blueprints",
+  // Next.js 13+ automatically uses app/icon.png or app/icon.svg as favicon
+  // Additional icons for better browser support
   icons: {
     icon: '/icon.png',
     shortcut: '/icon.png',

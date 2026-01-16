@@ -274,10 +274,8 @@ export const Header = () => {
           </nav>
           
           <div className="flex items-center gap-4">
-            {!loading && (
-              <>
-                {user ? (
-                  <DropdownMenu>
+            {user ? (
+              <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
@@ -320,7 +318,7 @@ export const Header = () => {
                             className="text-sm font-semibold leading-tight text-foreground"
                             style={{ lineHeight: '1.3' }}
                           >
-                            Mon compte
+                            My account
                           </p>
                           <p 
                             className="text-xs leading-tight text-[hsl(210_40%_60%)]"
@@ -376,7 +374,7 @@ export const Header = () => {
                           fontWeight: '500',
                         }}
                       >
-                        S&apos;inscrire
+                        Sign up
                       </Button>
                     </Link>
                     <Button
@@ -392,12 +390,10 @@ export const Header = () => {
                         `,
                       }}
                     >
-                      Se connecter
+                      Sign in
                     </Button>
                   </>
                 )}
-              </>
-            )}
           </div>
         </div>
       </div>
