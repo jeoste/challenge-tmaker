@@ -19,7 +19,7 @@ export default function SignupPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-canvas flex items-center justify-center">
-        <div className="text-muted-foreground">Chargement...</div>
+        <div className="text-muted-foreground">Loading...</div>
       </div>
     );
   }
@@ -34,22 +34,22 @@ export default function SignupPage() {
         <div className="bg-card border border-border rounded-2xl p-8 backdrop-blur-sm glass-card">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">
-              Inscription
+              Sign up
             </h1>
             <p className="text-muted-foreground">
-              Créez votre compte pour commencer
+              Create your account to get started
             </p>
           </div>
 
           <SignupForm />
 
           <div className="mt-6 text-center text-sm text-muted-foreground">
-            Déjà un compte ?{' '}
+            Already have an account?{' '}
             <Link
               href="/login"
               className="text-primary hover:underline"
             >
-              Se connecter
+              Sign in
             </Link>
           </div>
         </div>

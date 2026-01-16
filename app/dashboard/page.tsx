@@ -330,7 +330,7 @@ export default function DashboardPage() {
                   <CardHeader className="p-0 pb-4">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-sm font-medium text-muted-foreground">
-                        Opportunités
+                        Opportunities
                       </CardTitle>
                       <Sparkles className="h-5 w-5 text-primary/60" />
                     </div>

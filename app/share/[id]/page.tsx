@@ -34,7 +34,7 @@ export default function SharePage() {
         setData(result);
       } catch (err) {
         console.error('Error fetching share data:', err);
-        setError('Share non trouvé');
+        setError('Share not found');
       } finally {
         setLoading(false);
       }
@@ -46,7 +46,7 @@ export default function SharePage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-muted-foreground">Chargement...</div>
+        <div className="text-muted-foreground">Loading...</div>
       </div>
     );
   }
@@ -56,9 +56,9 @@ export default function SharePage() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="glass-card p-8 text-center">
           <h2 className="text-2xl font-bold text-foreground mb-4">
-            Share non trouvé
+            Share not found
           </h2>
-          <Button onClick={() => router.push('/')}>Retour à l&apos;accueil</Button>
+          <Button onClick={() => router.push('/')}>Back to home</Button>
         </div>
       </div>
     );
@@ -76,9 +76,9 @@ export default function SharePage() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="glass-card p-8 text-center">
           <h2 className="text-2xl font-bold text-foreground mb-4">
-            Aucune donnée disponible
+            No data available
           </h2>
-          <Button onClick={() => router.push('/')}>Retour à l&apos;accueil</Button>
+          <Button onClick={() => router.push('/')}>Back to home</Button>
         </div>
       </div>
     );
@@ -108,14 +108,14 @@ export default function SharePage() {
       <div className="max-w-4xl mx-auto">
         <div className="glass-card p-8">
           <h1 className="text-3xl font-bold text-foreground mb-6 text-center">
-            🎉 Ton Gold Card est prête !
+            🎉 Your Gold Card is ready!
           </h1>
 
           {/* Show pain point selector if multiple pain points */}
           {data.pains && data.pains.length > 1 && (
             <div className="mb-6">
               <p className="text-sm text-muted-foreground mb-3 text-center">
-                Sélectionner un pain point à partager :
+                Select a pain point to share:
               </p>
               <div className="flex flex-wrap gap-2 justify-center">
                 {data.pains.map((pain: PainPoint) => (
@@ -152,7 +152,7 @@ export default function SharePage() {
               className="flex items-center gap-2"
             >
               <Download className="h-4 w-4" />
-              Télécharger
+              Download
             </Button>
             <Button
               onClick={handleShare}
@@ -169,7 +169,7 @@ export default function SharePage() {
               variant="ghost"
               onClick={() => router.push(`/results/${encodeURIComponent(data.niche)}`)}
             >
-              Voir l&apos;analyse complète
+              View full analysis
             </Button>
           </div>
         </div>

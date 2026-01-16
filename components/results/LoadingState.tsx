@@ -135,7 +135,7 @@ export function LoadingState({ totalTasks = 4 }: LoadingStateProps) {
           <div className="flex items-center gap-3 mb-6">
             <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
             <h2 className="text-lg font-mono text-terminal">
-              Scan en cours...
+              Scan in progress...
             </h2>
           </div>
         </div>

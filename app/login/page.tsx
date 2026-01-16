@@ -44,7 +44,7 @@ function LoginContent() {
               Connexion
             </h1>
             <p className="text-muted-foreground">
-              Accédez à Unearth
+              Access Unearth
             </p>
           </div>
 

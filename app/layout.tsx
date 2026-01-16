@@ -10,9 +10,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Unearth - Trouve des Idées SaaS Validées par Reddit",
+  title: "Unearth - Find Reddit-Validated SaaS Ideas",
   description:
-    "Scanne automatiquement les pain points Reddit et génère des blueprints de micro-SaaS prêts à lancer",
+    "Automatically scans Reddit pain points and generates ready-to-launch micro-SaaS blueprints",
   icons: {
     icon: '/icon.png',
     shortcut: '/icon.png',
@@ -26,7 +26,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" className={inter.variable}>
+    <html lang="en" className={inter.variable}>
       <body className="antialiased">
         <Providers>{children}</Providers>
       </body>

@@ -14,7 +14,7 @@ export default function Home() {
   const [selectedProblemType, setSelectedProblemType] = useState<string | null>(null);
   const [selectedEngagementLevel, setSelectedEngagementLevel] = useState<string | null>(null);
 
-  // Garder les suggestions visibles si une sélection a été faite
+  // Keep suggestions visible if a selection has been made
   const shouldShowSuggestions = showSuggestions || selectedNiche !== null;
 
   const handleNicheSelect = (niche: { name: string; id: string }) => {

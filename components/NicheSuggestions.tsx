@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 
-// Les 5 niches principales de la landing page
+// The 5 main niches on the landing page
 const niches = [
   { name: "SaaS & Indie Hacking", id: "saas & indie hacking" },
   { name: "Dropshipping", id: "dropshipping" },
@@ -25,20 +25,20 @@ const problemTypes = [
 ];
 
 const engagementLevels = [
-  { 
-    name: "Viral", 
+  {
+    name: "Viral",
     id: "viral",
-    description: "100+ upvotes ou 50+ comments"
+    description: "100+ upvotes or 50+ comments"
   },
-  { 
-    name: "High engagement", 
+  {
+    name: "High engagement",
     id: "high",
-    description: "20+ upvotes ou 10+ comments"
+    description: "20+ upvotes or 10+ comments"
   },
-  { 
-    name: "All posts", 
+  {
+    name: "All posts",
     id: "all",
-    description: "Tous les posts"
+    description: "All posts"
   }
 ];
 
@@ -69,8 +69,8 @@ export const NicheSuggestions = ({
 
   if (!visible) return null;
 
-  // Déterminer l'étape actuelle pour l'affichage
-  // On affiche toujours l'étape 1, puis les étapes suivantes si les sélections précédentes sont faites
+  // Determine the current step for display
+  // Always show step 1, then subsequent steps if previous selections are made
   const showStep1 = true;
   const showStep2 = selectedNiche !== null;
   const showStep3 = selectedSource !== null;
@@ -92,7 +92,7 @@ export const NicheSuggestions = ({
   const handleEngagementClick = (level: { name: string; id: string; description: string }) => {
     onEngagementSelect?.(level);
     
-    // Construire l'URL avec tous les paramètres et naviguer
+    // Build URL with all parameters and navigate
     const params = new URLSearchParams();
     if (selectedSource) params.set('source', selectedSource);
     if (selectedProblemType) params.set('type', selectedProblemType);
@@ -105,12 +105,12 @@ export const NicheSuggestions = ({
 
   return (
     <div className="w-full max-w-[680px] mx-auto mt-6 space-y-8" data-search-suggestions>
-      {/* Étape 1: Niches */}
+      {/* Step 1: Niches */}
       {showStep1 && (
         <div className="fade-in">
           <div className="mb-3">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide text-center">
-              Étape 1
+              Step 1
             </h3>
           </div>
           <div className="flex flex-wrap justify-center gap-3">
@@ -135,12 +135,12 @@ export const NicheSuggestions = ({
         </div>
       )}
 
-      {/* Étape 2: Sources */}
+      {/* Step 2: Sources */}
       {showStep2 && (
         <div className="fade-in">
           <div className="mb-3">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide text-center">
-              Étape 2
+              Step 2
             </h3>
           </div>
           <div className="flex flex-wrap justify-center gap-3">
@@ -170,12 +170,12 @@ export const NicheSuggestions = ({
         </div>
       )}
 
-      {/* Étape 3: Types de problèmes */}
+      {/* Step 3: Problem Types */}
       {showStep3 && (
         <div className="fade-in">
           <div className="mb-3">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide text-center">
-              Étape 3
+              Step 3
             </h3>
           </div>
           <div className="flex flex-wrap justify-center gap-3">
@@ -200,12 +200,12 @@ export const NicheSuggestions = ({
         </div>
       )}
 
-      {/* Étape 4: Niveaux d'engagement */}
+      {/* Step 4: Engagement Levels */}
       {showStep4 && (
         <div className="fade-in">
           <div className="mb-3">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide text-center">
-              Étape 4
+              Step 4
             </h3>
           </div>
           <div className="flex flex-wrap justify-center gap-3">

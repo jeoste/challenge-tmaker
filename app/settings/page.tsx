@@ -45,14 +45,14 @@ export default function SettingsPage() {
             <Link href="/dashboard">
               <Button variant="outline" className="flex items-center gap-2 mb-4">
                 <ArrowLeft className="h-4 w-4" />
-                Retour
+                Back
               </Button>
             </Link>
             <h1 className="text-4xl font-bold text-foreground mb-2 tracking-tight">
               Settings
             </h1>
             <p className="text-muted-foreground text-lg">
-              Gérez vos paramètres de compte
+              Manage your account settings
             </p>
           </div>
 
@@ -77,14 +77,14 @@ export default function SettingsPage() {
 
           <Card className="glass-card p-6 mt-6">
             <CardHeader>
-              <CardTitle>À venir</CardTitle>
+              <CardTitle>Coming Soon</CardTitle>
               <CardDescription>
-                Fonctionnalités en développement
+                Features in development
               </CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Les paramètres avancés seront disponibles prochainement.
+                Advanced settings will be available soon.
               </p>
             </CardContent>
           </Card>

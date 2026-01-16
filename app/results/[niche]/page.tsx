@@ -85,8 +85,8 @@ export default function ResultsPage() {
       try {
         if (authLoading) return;
         if (!session?.access_token) {
-          setError('Authentification requise');
-          setErrorDetails('Vous devez être connecté pour effectuer un scan.');
+          setError('Authentication required');
+          setErrorDetails('You must be logged in to perform a scan.');
           setTimeout(() => router.push('/login'), 2000);
           setLoading(false);
           return;
@@ -169,36 +169,36 @@ export default function ResultsPage() {
           
           if (response.status === 401) {
             setError('Authentification requise');
-            setErrorDetails('Vous devez être connecté pour effectuer un scan.');
+            setErrorDetails('You must be logged in to perform a scan.');
             setTimeout(() => router.push('/login'), 2000);
             return;
           }
           
           if (response.status === 429) {
-            setError('Limite de requêtes atteinte');
+            setError('Request limit reached');
             const resetTime = errorData.reset ? new Date(errorData.reset).toLocaleTimeString('fr-FR') : null;
             const remaining = errorData.remaining !== undefined ? errorData.remaining : 0;
-            let details = 'Vous avez atteint la limite de 5 scans par heure.';
+            let details = 'You have reached the limit of 5 scans per hour.';
             if (resetTime) {
-              details += ` Vous pourrez réessayer après ${resetTime}.`;
+              details += ` You can try again after ${resetTime}.`;
             } else {
-              details += ' Veuillez réessayer plus tard.';
+              details += ' Please try again later.';
             }
             if (remaining === 0) {
-              details += ' Si vous venez de créer un compte, il se peut que vous ayez déjà utilisé votre quota avant de vous connecter.';
+              details += ' If you just created an account, you may have already used your quota before logging in.';
             }
             setErrorDetails(details);
             return;
           }
           
           if (response.status === 400) {
-            setError('Requête invalide');
-            setErrorDetails(errorData.error || 'La niche spécifiée est invalide.');
+            setError('Invalid request');
+            setErrorDetails(errorData.error || 'The specified niche is invalid.');
             return;
           }
           
           setError('Erreur lors du scan');
-          setErrorDetails(errorData.error || 'Une erreur est survenue. Veuillez réessayer.');
+          setErrorDetails(errorData.error || 'An error occurred. Please try again.');
           return;
         }
 
@@ -212,7 +212,7 @@ export default function ResultsPage() {
           console.log('Analysis not saved (user not authenticated or save failed)');
         }
       } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.';
+        const errorMessage = err instanceof Error ? err.message : 'Unable to connect to server. Check your internet connection.';
         console.error('Error fetching results:', err);
         setError('Erreur de connexion');
         setErrorDetails(errorMessage);
@@ -274,7 +274,7 @@ export default function ResultsPage() {
                   try {
                     if (!session?.access_token) {
                       setError('Authentification requise');
-                      setErrorDetails('Vous devez être connecté pour effectuer un scan.');
+                      setErrorDetails('You must be logged in to perform a scan.');
                       setTimeout(() => router.push('/login'), 2000);
                       setLoading(false);
                       return;
@@ -294,25 +294,25 @@ export default function ResultsPage() {
                       const errorData = await response.json().catch(() => ({}));
                       
                       if (response.status === 429) {
-                        setError('Limite de requêtes atteinte');
-                        const resetTime = errorData.reset ? new Date(errorData.reset).toLocaleTimeString('fr-FR') : null;
+                        setError('Request limit reached');
+                        const resetTime = errorData.reset ? new Date(errorData.reset).toLocaleTimeString('en-US') : null;
                         const remaining = errorData.remaining !== undefined ? errorData.remaining : 0;
-                        let details = 'Vous avez atteint la limite de 5 scans par heure.';
+                        let details = 'You have reached the limit of 5 scans per hour.';
                         if (resetTime) {
-                          details += ` Vous pourrez réessayer après ${resetTime}.`;
+                          details += ` You can try again after ${resetTime}.`;
                         } else {
-                          details += ' Veuillez réessayer plus tard.';
+                          details += ' Please try again later.';
                         }
                         if (remaining === 0) {
-                          details += ' Si vous venez de créer un compte, il se peut que vous ayez déjà utilisé votre quota avant de vous connecter.';
+                          details += ' If you just created an account, you may have already used your quota before logging in.';
                         }
                         setErrorDetails(details);
                         setLoading(false);
                         return;
                       }
                       
-                      setError('Erreur lors du scan');
-                      setErrorDetails(errorData.error || 'Une erreur est survenue. Veuillez réessayer.');
+                      setError('Scan error');
+                      setErrorDetails(errorData.error || 'An error occurred. Please try again.');
                       setLoading(false);
                       return;
                     }
@@ -330,7 +330,7 @@ export default function ResultsPage() {
                 className="flex items-center gap-2"
               >
                 <RefreshCw className="h-4 w-4" />
-                Réessayer
+                Retry
               </Button>
             </div>
           </div>
@@ -346,15 +346,15 @@ export default function ResultsPage() {
           <ResultsHeader niche={niche} />
           <div className="glass-card p-8 text-center">
             <h2 className="text-2xl font-bold text-foreground mb-4">
-              Aucun pain point trouvé
+              No pain points found
             </h2>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Aucune opportunité SaaS n&apos;a été trouvée pour cette niche. 
-              Essayez une autre niche ou vérifiez plus tard.
+              No SaaS opportunity was found for this niche.
+              Try another niche or check back later.
             </p>
             {data && (
               <p className="text-sm text-muted-foreground mb-6">
-                {data.totalPosts} posts scannés • Aucun résultat valide
+                {data.totalPosts} posts scanned • No valid results
               </p>
             )}
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -378,7 +378,7 @@ export default function ResultsPage() {
         <ResultsHeader niche={niche} />
         
         <div className="mb-6 text-sm text-muted-foreground">
-          Scanné {data.totalPosts} posts Reddit • Mis à jour il y a{' '}
+          Scanned {data.totalPosts} Reddit posts • Updated{' '}
           {Math.round(
             (Date.now() - new Date(data.scannedAt).getTime()) / 60000
           )}{' '}
@@ -411,7 +411,7 @@ export default function ResultsPage() {
         <div className="mt-12 text-center">
           <div className="glass-card p-6 inline-block">
             <p className="text-muted-foreground mb-4">
-              {data.id ? 'Analyse sauvegardée' : 'Vous voulez analyser une autre niche ?'}
+              {data.id ? 'Analysis saved' : 'Want to analyze another niche?'}
             </p>
             <div className="flex gap-3 justify-center">
               <Button

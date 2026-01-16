@@ -36,7 +36,7 @@ function PricingSuccessContent() {
                 Traitement en cours...
               </h1>
               <p className="text-muted-foreground">
-                Vérification de votre abonnement
+                Verifying your subscription
               </p>
             </>
           ) : error ? (
@@ -58,11 +58,11 @@ function PricingSuccessContent() {
                 <CheckCircle2 className="w-8 h-8 text-green-500" />
               </div>
               <h1 className="text-2xl font-semibold text-foreground mb-2">
-                Abonnement activé !
+                Subscription activated!
               </h1>
               <p className="text-muted-foreground mb-6">
-                Votre abonnement Pro a été activé avec succès. Vous pouvez
-                maintenant profiter de toutes les fonctionnalités premium.
+                Your Pro subscription has been successfully activated. You can
+                now enjoy all premium features.
               </p>
               {checkoutId && (
                 <p className="text-xs text-muted-foreground mb-6">
@@ -81,7 +81,7 @@ function PricingSuccessContent() {
                   onClick={() => router.push("/")}
                   className="flex-1"
                 >
-                  Retour à l&apos;accueil
+                  Back to home
                 </Button>
               </div>
             </>
@@ -101,7 +101,7 @@ export default function PricingSuccessPage() {
           <div className="max-w-md w-full glass-card p-8 text-center">
             <Loader2 className="w-16 h-16 text-primary mx-auto mb-4 animate-spin" />
             <h1 className="text-2xl font-semibold text-foreground mb-2">
-              Chargement...
+              Loading...
             </h1>
           </div>
         </main>
