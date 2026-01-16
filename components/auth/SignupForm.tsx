@@ -19,40 +19,40 @@ export function SignupForm() {
     e.preventDefault();
 
     if (password !== confirmPassword) {
-      toast.error('Les mots de passe ne correspondent pas');
+      toast.error('Passwords do not match');
       return;
     }
 
     if (password.length < 6) {
-      toast.error('Le mot de passe doit contenir au moins 6 caractères');
+      toast.error('Password must contain at least 6 characters');
       return;
     }
 
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password,
       });
 
       if (error) {
-        toast.error(error.message || 'Erreur lors de l\'inscription');
+        toast.error(error.message || 'Error during registration');
         return;
       }
 
-      // Afficher un message indiquant qu'un email de confirmation a été envoyé
+      // Display a message indicating that a confirmation email has been sent
       toast.success(
-        'Inscription réussie ! Un email de confirmation a été envoyé. Veuillez valider votre adresse email avant de vous connecter.',
+        'Registration successful! A confirmation email has been sent. Please validate your email address before logging in.',
         { duration: 8000 }
       );
       
-      // Rediriger vers la page de login après un court délai
+      // Redirect to login page after a short delay
       setTimeout(() => {
         router.push('/login');
       }, 2000);
-    } catch (error) {
-      toast.error('Une erreur est survenue');
+    } catch {
+      toast.error('An error occurred');
     } finally {
       setLoading(false);
     }
@@ -65,7 +65,7 @@ export function SignupForm() {
         <Input
           id="email"
           type="email"
-          placeholder="votre@email.com"
+          placeholder="your@email.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -75,7 +75,7 @@ export function SignupForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password">Mot de passe</Label>
+        <Label htmlFor="password">Password</Label>
         <Input
           id="password"
           type="password"
@@ -88,12 +88,12 @@ export function SignupForm() {
           disabled={loading}
         />
         <p className="text-xs text-muted-foreground">
-          Minimum 6 caractères
+          Minimum 6 characters
         </p>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
+        <Label htmlFor="confirmPassword">Confirm Password</Label>
         <Input
           id="confirmPassword"
           type="password"
@@ -112,7 +112,7 @@ export function SignupForm() {
         className="w-full bg-primary text-primary-foreground hover:opacity-90 transition-all"
         disabled={loading}
       >
-        {loading ? 'Inscription...' : 'S\'inscrire'}
+        {loading ? 'Signing up...' : 'Sign Up'}
       </Button>
     </form>
   );

@@ -23,6 +23,22 @@ export const Footer = () => {
             >
               FAQ
             </Link>
+            <a
+              href="https://insigh.to/b/unearth"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Feedback
+            </a>
+            <a
+              href="https://x.com/jeo_ste"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Contact
+            </a>
           </div>
         </div>
       </div>

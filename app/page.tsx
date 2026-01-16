@@ -9,6 +9,35 @@ import { RotatingWords } from "@/components/RotatingWords";
 
 export default function Home() {
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedNiche, setSelectedNiche] = useState<string | null>(null);
+  const [selectedSource, setSelectedSource] = useState<string | null>(null);
+  const [selectedProblemType, setSelectedProblemType] = useState<string | null>(null);
+  const [selectedEngagementLevel, setSelectedEngagementLevel] = useState<string | null>(null);
+
+  // Garder les suggestions visibles si une sélection a été faite
+  const shouldShowSuggestions = showSuggestions || selectedNiche !== null;
+
+  const handleNicheSelect = (niche: { name: string; id: string }) => {
+    setSelectedNiche(niche.id);
+    setSelectedSource(null);
+    setSelectedProblemType(null);
+    setSelectedEngagementLevel(null);
+  };
+
+  const handleSourceSelect = (source: { name: string; id: string; available: boolean }) => {
+    setSelectedSource(source.id);
+    setSelectedProblemType(null);
+    setSelectedEngagementLevel(null);
+  };
+
+  const handleProblemTypeSelect = (type: { name: string; id: string }) => {
+    setSelectedProblemType(type.id);
+    setSelectedEngagementLevel(null);
+  };
+
+  const handleEngagementSelect = (level: { name: string; id: string; description: string }) => {
+    setSelectedEngagementLevel(level.id);
+  };
 
   return (
     <div className="min-h-screen bg-mesh bg-grid">
@@ -42,7 +71,17 @@ export default function Home() {
           />
 
           {/* Niche Suggestions */}
-          <NicheSuggestions visible={showSuggestions} />
+          <NicheSuggestions 
+            visible={shouldShowSuggestions}
+            onNicheSelect={handleNicheSelect}
+            onSourceSelect={handleSourceSelect}
+            onProblemTypeSelect={handleProblemTypeSelect}
+            onEngagementSelect={handleEngagementSelect}
+            selectedNiche={selectedNiche}
+            selectedSource={selectedSource}
+            selectedProblemType={selectedProblemType}
+            selectedEngagementLevel={selectedEngagementLevel}
+          />
 
           {/* Keyboard shortcut hint */}
           <div className="mt-8 flex items-center justify-center gap-2 text-xs text-muted-foreground">

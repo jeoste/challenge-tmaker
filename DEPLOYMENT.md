@@ -52,13 +52,20 @@ GEMINI_API_KEY=...
 SERPER_DEV_API_KEY=...
 
 # RapidAPI Reddit (optionnel - pour enrichir les données Reddit)
-# Quota: 50 requêtes/mois - TRÈS LIMITÉ - Limité à 1-2 requêtes par utilisateur/jour
-# APIs utilisées:
-# - reddit3: Recherche de posts Reddit (prioritaire)
-# - reddit34: Métadonnées des subreddits (uniquement premium)
-# Free: 1 requête/jour (recherche uniquement)
-# Premium: 2 requêtes/jour (recherche + métadonnées)
-RAPID_API_KEY=...
+# RapidAPI Reddit - Deux souscriptions séparées avec quotas différents
+# TRÈS LIMITÉ - Limité à 1-2 requêtes par utilisateur/jour
+# 
+# Souscription 1 - reddit3: 100 requêtes/mois
+# - Recherche de posts Reddit (prioritaire)
+# - Données utilisateur (comments, posts)
+# 
+# Souscription 2 - reddit34: 50 requêtes/mois
+# - Métadonnées des subreddits (uniquement premium)
+# 
+# Les deux utilisent la même clé API mais ont des quotas séparés
+# Free: 1 requête/jour (recherche uniquement via reddit3)
+# Premium: 2 requêtes/jour (recherche + métadonnées + données utilisateur)
+RAPID_API_KEY=7421ad9ae9mshcfaf7140ea0efadp1e3bb1jsn328c7e615a2b
 
 # Upstash Redis (cache + rate limiting)
 UPSTASH_REDIS_REST_URL=https://...

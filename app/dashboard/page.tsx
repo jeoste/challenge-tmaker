@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
@@ -20,31 +20,32 @@ import {
   Sparkles,
   Zap,
   Award,
-  Clock,
   FileText
 } from 'lucide-react';
 import Link from 'next/link';
 import { GoldScoreBadge } from '@/components/shared/GoldScoreBadge';
 import { motion } from 'framer-motion';
 
+import { PainPoint } from '@/types';
+
 interface Analysis {
   id: string;
   niche: string;
   scanned_at: string;
   total_posts: number;
-  pains: any[];
+  pains: PainPoint[];
 }
 
 interface Favorite {
   id: string;
   analysis_id: string;
   pain_point_id: string;
-  pain_point_data: any;
+  pain_point_data: PainPoint;
   created_at: string;
 }
 
 interface PainPointWithAnalysis {
-  painPoint: any;
+  painPoint: PainPoint;
   analysis: Analysis;
   analysisId: string;
 }
@@ -89,7 +90,7 @@ export default function DashboardPage() {
           return;
         }
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Erreur lors du chargement des analyses');
+        throw new Error(errorData.error || 'Error loading analyses');
       }
 
       const data = await response.json();
@@ -98,9 +99,10 @@ export default function DashboardPage() {
         new Map((data.analyses || []).map((a: Analysis) => [a.id, a])).values()
       );
       setAnalyses(uniqueAnalyses);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
       console.error('Error fetching analyses:', err);
-      setError(err.message || 'Une erreur est survenue');
+      setError(errorMessage);
       setAnalyses([]);
     }
   };
@@ -123,12 +125,12 @@ export default function DashboardPage() {
 
       const data = await response.json();
       setFavorites(data.favorites || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching favorites:', err);
     }
   };
 
-  const toggleFavorite = async (analysisId: string, painPoint: any) => {
+  const toggleFavorite = async (analysisId: string, painPoint: PainPoint) => {
     if (!session?.access_token) return;
 
     const isFavorited = favorites.some(
@@ -167,7 +169,7 @@ export default function DashboardPage() {
           setFavorites([...favorites, data.favorite]);
         } else {
           const errorData = await response.json();
-          alert(errorData.error || 'Erreur lors de l\'ajout aux favoris');
+          alert(errorData.error || 'Error adding to favorites');
         }
       }
     } catch (err) {
@@ -198,7 +200,7 @@ export default function DashboardPage() {
   const allPainPoints: PainPointWithAnalysis[] = useMemo(() => {
     const points: PainPointWithAnalysis[] = [];
     analyses.forEach(analysis => {
-      analysis.pains?.forEach((pain: any) => {
+      analysis.pains?.forEach((pain: PainPoint) => {
         points.push({
           painPoint: pain,
           analysis,
@@ -236,13 +238,13 @@ export default function DashboardPage() {
           <div className="max-w-6xl mx-auto">
             <Card className="glass-card p-12 text-center">
               <h2 className="text-2xl font-bold text-foreground mb-4">
-                Redirection en cours...
+                Redirecting...
               </h2>
               <p className="text-muted-foreground mb-6">
-                Vous allez être redirigé vers la page de connexion.
+                You will be redirected to the login page.
               </p>
               <Link href="/login?redirect=/dashboard">
-                <Button>Se connecter</Button>
+                <Button>Log In</Button>
               </Link>
             </Card>
           </div>
@@ -264,13 +266,13 @@ export default function DashboardPage() {
                   Dashboard
                 </h1>
                 <p className="text-muted-foreground text-lg">
-                  Métriques d'utilisation et historique de vos idées
+                  Usage metrics and your ideas history
                 </p>
               </div>
               <Link href="/">
                 <Button variant="outline" className="flex items-center gap-2">
                   <ArrowLeft className="h-4 w-4" />
-                  Accueil
+                  Home
                 </Button>
               </Link>
             </div>
@@ -286,7 +288,7 @@ export default function DashboardPage() {
                     className="flex items-center gap-2"
                   >
                     <RefreshCw className="h-4 w-4" />
-                    Réessayer
+                    Try Again
                   </Button>
                 </div>
               </Card>
@@ -313,7 +315,7 @@ export default function DashboardPage() {
                       {metrics.totalAnalyses}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Analyses effectuées
+                      Analyses performed
                     </p>
                   </CardContent>
                 </Card>
@@ -338,7 +340,7 @@ export default function DashboardPage() {
                       {metrics.totalOpportunities}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Idées découvertes
+                      Ideas discovered
                     </p>
                   </CardContent>
                 </Card>
@@ -353,7 +355,7 @@ export default function DashboardPage() {
                   <CardHeader className="p-0 pb-4">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-sm font-medium text-muted-foreground">
-                        Score moyen
+                        Average Score
                       </CardTitle>
                       <Award className="h-5 w-5 text-primary/60" />
                     </div>
@@ -388,7 +390,7 @@ export default function DashboardPage() {
                       {metrics.totalFavorites}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {metrics.totalFavorites >= 3 ? 'Limite atteinte' : 'Idées sauvegardées'}
+                      {metrics.totalFavorites >= 3 ? 'Limit reached' : 'Saved ideas'}
                     </p>
                   </CardContent>
                 </Card>
@@ -396,19 +398,19 @@ export default function DashboardPage() {
             </div>
 
             {/* Tabs */}
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'overview' | 'ideas' | 'favorites')} className="w-full">
               <TabsList className="glass-card p-1 w-fit">
                 <TabsTrigger value="overview" className="flex items-center gap-2">
                   <BarChart3 className="h-4 w-4" />
-                  Vue d'ensemble
+                  Overview
                 </TabsTrigger>
                 <TabsTrigger value="ideas" className="flex items-center gap-2">
                   <Zap className="h-4 w-4" />
-                  Idées ({allPainPoints.length})
+                  Ideas ({allPainPoints.length})
                 </TabsTrigger>
                 <TabsTrigger value="favorites" className="flex items-center gap-2">
                   <Star className="h-4 w-4" />
-                  Favoris ({favorites.length})
+                  Favorites ({favorites.length})
                 </TabsTrigger>
               </TabsList>
 
@@ -419,15 +421,15 @@ export default function DashboardPage() {
                       <BarChart3 className="h-8 w-8 text-primary" />
                     </div>
                     <h2 className="text-2xl font-bold text-foreground mb-4">
-                      Bienvenue sur votre Dashboard
+                      Welcome to your Dashboard
                     </h2>
                     <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-                      Commencez par analyser une niche pour débloquer tout le potentiel d'Unearth.
+                      Start by analyzing a niche to unlock Unearth&apos;s full potential.
                     </p>
                     <Link href="/">
                       <Button size="lg" className="flex items-center gap-2">
                         <TrendingUp className="h-5 w-5" />
-                        Lancer ma première analyse
+                        Launch my first analysis
                       </Button>
                     </Link>
                   </Card>
@@ -449,7 +451,7 @@ export default function DashboardPage() {
                                 </h3>
                                 <Badge variant="outline" className="flex items-center gap-1">
                                   <Calendar className="h-3 w-3" />
-                                  {new Date(analysis.scanned_at).toLocaleDateString('fr-FR', {
+                                  {new Date(analysis.scanned_at).toLocaleDateString('en-US', {
                                     day: 'numeric',
                                     month: 'short',
                                     year: 'numeric',
@@ -464,7 +466,7 @@ export default function DashboardPage() {
                                 <span>•</span>
                                 <span className="flex items-center gap-1">
                                   <Target className="h-4 w-4" />
-                                  {analysis.pains?.length || 0} opportunités
+                                  {analysis.pains?.length || 0} opportunities
                                 </span>
                               </div>
                             </div>
@@ -472,7 +474,7 @@ export default function DashboardPage() {
                               <Link href={analysis.id ? `/results/${encodeURIComponent(analysis.niche)}?id=${analysis.id}` : `/results/${encodeURIComponent(analysis.niche)}`}>
                                 <Button variant="outline" size="sm" className="flex items-center gap-2">
                                   <ExternalLink className="h-4 w-4" />
-                                  Voir
+                                  View
                                 </Button>
                               </Link>
                             </div>
@@ -491,13 +493,13 @@ export default function DashboardPage() {
                       <Zap className="h-8 w-8 text-primary" />
                     </div>
                     <h2 className="text-2xl font-bold text-foreground mb-4">
-                      Aucune idée pour le moment
+                      No ideas yet
                     </h2>
                     <p className="text-muted-foreground mb-8">
-                      Analysez une niche pour découvrir des opportunités SaaS.
+                      Analyze a niche to discover SaaS opportunities.
                     </p>
                     <Link href="/">
-                      <Button size="lg">Lancer une analyse</Button>
+                      <Button size="lg">Launch an analysis</Button>
                     </Link>
                   </Card>
                 ) : (
@@ -530,18 +532,18 @@ export default function DashboardPage() {
                                 </p>
                                 <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
                                   {item.painPoint.blueprint?.marketSize && (
-                                    <span>Marché: {item.painPoint.blueprint.marketSize}</span>
+                                    <span>Market: {item.painPoint.blueprint.marketSize}</span>
                                   )}
                                   {item.painPoint.blueprint?.mrrEstimate && (
                                     <span>• MRR: {item.painPoint.blueprint.mrrEstimate}</span>
                                   )}
-                                  <span>• {item.painPoint.postsCount || 1} posts similaires</span>
+                                  <span>• {item.painPoint.postsCount || 1} similar posts</span>
                                 </div>
                                 <div className="flex gap-2">
                                   <Link href={`/results/${encodeURIComponent(item.analysis.niche)}#pain-${item.painPoint.id}`}>
                                     <Button variant="outline" size="sm" className="flex items-center gap-2">
                                       <ExternalLink className="h-3 w-3" />
-                                      Voir
+                                      View
                                     </Button>
                                   </Link>
                                   {session?.access_token && (
@@ -554,7 +556,7 @@ export default function DashboardPage() {
                                       }`}
                                     >
                                       <Star className={`h-3 w-3 ${isFavorited ? 'fill-current' : ''}`} />
-                                      {isFavorited ? 'Favori' : 'Favoris'}
+                                      {isFavorited ? 'Favorite' : 'Favorites'}
                                     </Button>
                                   )}
                                 </div>
@@ -575,17 +577,17 @@ export default function DashboardPage() {
                       <Star className="h-8 w-8 text-yellow-500" />
                     </div>
                     <h2 className="text-2xl font-bold text-foreground mb-4">
-                      Aucun favori pour le moment
+                      No favorites yet
                     </h2>
                     <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-                      Ajoutez des opportunités à vos favoris depuis vos idées pour les retrouver facilement.
+                      Add opportunities to your favorites from your ideas to find them easily.
                     </p>
                     <Button
                       variant="outline"
                       onClick={() => setActiveTab('ideas')}
                       className="flex items-center gap-2"
                     >
-                      Voir mes idées
+                      View my ideas
                     </Button>
                   </Card>
                 ) : (
@@ -620,7 +622,7 @@ export default function DashboardPage() {
                                 </p>
                                 <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
                                   {painPoint.blueprint?.marketSize && (
-                                    <span>Marché: {painPoint.blueprint.marketSize}</span>
+                                    <span>Market: {painPoint.blueprint.marketSize}</span>
                                   )}
                                   {painPoint.blueprint?.mrrEstimate && (
                                     <span>• MRR: {painPoint.blueprint.mrrEstimate}</span>
@@ -631,7 +633,7 @@ export default function DashboardPage() {
                                     <Link href={`/results/${encodeURIComponent(analysis.niche)}#pain-${painPoint.id}`}>
                                       <Button variant="outline" size="sm" className="flex items-center gap-2">
                                         <ExternalLink className="h-3 w-3" />
-                                        Voir
+                                        View
                                       </Button>
                                     </Link>
                                   )}
@@ -642,7 +644,7 @@ export default function DashboardPage() {
                                     className="flex items-center gap-2 text-yellow-500"
                                   >
                                     <Star className="h-3 w-3 fill-current" />
-                                    Retirer
+                                    Remove
                                   </Button>
                                 </div>
                               </div>

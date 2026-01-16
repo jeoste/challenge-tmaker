@@ -12,8 +12,8 @@ const steps = [
   {
     number: 2,
     icon: Sparkles,
-    title: "AI scans Reddit",
-    description: "AI analyzes Reddit posts to find pain points",
+    title: "AI scans data sources",
+    description: "AI analyzes data sources to find pain points",
   },
   {
     number: 3,

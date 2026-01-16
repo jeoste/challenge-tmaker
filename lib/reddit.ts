@@ -138,11 +138,11 @@ export async function fetchRedditPosts(
 
 export function getSubredditsForNiche(niche: string): string[] {
     const mapping: Record<string, string[]> = {
-        'saas': ['SaaS', 'microsaas', 'startups', 'entrepreneur'],
-        'crm': ['salesforce', 'sales', 'CRM', 'SaaS'],
-        'analytics': ['analytics', 'dataisbeautiful', 'BusinessIntelligence', 'SaaS'],
-        'automation': ['automation', 'zapier', 'n8n', 'SaaS'],
-        'devtools': ['webdev', 'programming', 'SideProject', 'reactjs'],
+        'saas & indie hacking': ['SaaS', 'microsaas', 'startups', 'entrepreneur'],
+        'dropshipping': ['shopify', 'ecommerce', 'FacebookAds', 'dropshipping'],
+        'data & analytics': ['dataengineering', 'analytics', 'BusinessIntelligence', 'bigdata'],
+        'workflow automation': ['n8n', 'zapier', 'make-com', 'workflow'],
+        'developer tools': ['webdev', 'programming', 'DevOps', 'softwareengineering'],
         // Keep old mappings for backward compatibility
         'recruitment': ['recruitinghell', 'jobs', 'careerguidance', 'humanresources'],
         'recrutement': ['recruitinghell', 'jobs', 'careerguidance', 'humanresources'],

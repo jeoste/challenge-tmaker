@@ -38,7 +38,7 @@ export function PainPointCard({
 
   const handleToggleFavorite = async () => {
     if (!sessionToken || !analysisId) {
-      toast.error('Vous devez être connecté pour ajouter aux favoris');
+      toast.error('You must be logged in to add to favorites');
       return;
     }
 
@@ -53,11 +53,11 @@ export function PainPointCard({
 
         if (response.ok) {
           setIsFavorited(false);
-          toast.success('Retiré des favoris');
+          toast.success('Removed from favorites');
           onFavoriteToggle?.();
         } else {
           const errorData = await response.json();
-          toast.error(errorData.error || 'Erreur lors de la suppression');
+          toast.error(errorData.error || 'Error during removal');
         }
       } else {
         // Add favorite
@@ -76,16 +76,16 @@ export function PainPointCard({
 
         if (response.ok) {
           setIsFavorited(true);
-          toast.success('Ajouté aux favoris');
+          toast.success('Added to favorites');
           onFavoriteToggle?.();
         } else {
           const errorData = await response.json();
-          toast.error(errorData.error || 'Erreur lors de l\'ajout aux favoris');
+          toast.error(errorData.error || 'Error during addition');
         }
       }
     } catch (err) {
       console.error('Error toggling favorite:', err);
-      toast.error('Une erreur est survenue');
+      toast.error('An error occurred');
     } finally {
       setIsToggling(false);
     }
@@ -94,7 +94,7 @@ export function PainPointCard({
     const blueprintText = `Problem: ${painPoint.blueprint.problem}\n\nSolution: ${painPoint.blueprint.solutionName}\n${painPoint.blueprint.solutionPitch}\n\nMarket Size: ${painPoint.blueprint.marketSize}\nFirst Channel: ${painPoint.blueprint.firstChannel}\nMRR Estimate: ${painPoint.blueprint.mrrEstimate}\nTech Stack: ${painPoint.blueprint.techStack}`;
     
     navigator.clipboard.writeText(blueprintText);
-    toast.success('Blueprint copié !');
+    toast.success('Blueprint copied!');
   };
 
   const getMarketSizeColor = (size: string) => {
@@ -188,7 +188,7 @@ export function PainPointCard({
         {/* Problem Analysis */}
         <div className="mb-4 p-4 rounded-lg bg-secondary/30 border border-border">
           <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-            🔍 Problème identifié
+            🔍 Problem Identified
           </h4>
           <p className="text-sm text-muted-foreground leading-relaxed mb-2">
             {painPoint.blueprint.problem}
@@ -210,7 +210,7 @@ export function PainPointCard({
           </p>
           {painPoint.blueprint.howItSolves && (
             <div className="mt-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
-              <p className="text-xs font-medium text-primary mb-1">Comment ça résout le problème :</p>
+              <p className="text-xs font-medium text-primary mb-1">How it solves the problem:</p>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 {painPoint.blueprint.howItSolves}
               </p>
@@ -221,7 +221,7 @@ export function PainPointCard({
         {/* Key Features if available */}
         {painPoint.blueprint.keyFeatures && painPoint.blueprint.keyFeatures.length > 0 && (
           <div className="mb-3">
-            <p className="text-xs font-medium text-muted-foreground mb-1.5">Fonctionnalités clés :</p>
+            <p className="text-xs font-medium text-muted-foreground mb-1.5">Key Features:</p>
             <div className="flex flex-wrap gap-1.5">
               {painPoint.blueprint.keyFeatures.map((feature, idx) => (
                 <span
@@ -239,7 +239,7 @@ export function PainPointCard({
         {painPoint.blueprint.roadmap && (
           <div className="mb-4 p-4 rounded-lg bg-gradient-to-br from-primary/10 to-purple-500/10 border border-primary/20">
             <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-              🗺️ Feuille de route
+              🗺️ Roadmap
             </h4>
             <div className="space-y-3">
               {painPoint.blueprint.roadmap.phase1 && (
@@ -283,7 +283,7 @@ export function PainPointCard({
         {/* Target Audience if available */}
         {painPoint.blueprint.targetAudience && (
           <p className="text-xs text-muted-foreground mb-2">
-            🎯 Cible: {painPoint.blueprint.targetAudience}
+            🎯 Target: {painPoint.blueprint.targetAudience}
           </p>
         )}
         
@@ -295,7 +295,7 @@ export function PainPointCard({
         )}
         
         <p className="text-sm text-muted-foreground mt-2">
-          📊 {painPoint.postsCount} post{painPoint.postsCount > 1 ? 's' : ''} similaire{painPoint.postsCount > 1 ? 's' : ''} cette semaine
+          📊 {painPoint.postsCount} similar post{painPoint.postsCount > 1 ? 's' : ''} this week
         </p>
         
         {/* Reddit Post Link */}
@@ -352,7 +352,7 @@ export function PainPointCard({
             }`}
           >
             <Star className={`h-4 w-4 ${isFavorited ? 'fill-current' : ''}`} />
-            {isFavorited ? 'Favori' : 'Favoris'}
+            {isFavorited ? 'Favorite' : 'Favorites'}
           </Button>
         )}
         <Button
@@ -362,7 +362,7 @@ export function PainPointCard({
           className="flex items-center gap-2"
         >
           <Copy className="h-4 w-4" />
-          Copier Blueprint
+          Copy Blueprint
         </Button>
         <Button
           variant="outline"
@@ -383,7 +383,7 @@ export function PainPointCard({
           className="flex items-center gap-2"
         >
           <Share2 className="h-4 w-4" />
-          Partager
+          Share
         </Button>
       </div>
     </motion.div>

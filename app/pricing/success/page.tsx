@@ -5,14 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Loader2 } from "lucide-react";
-import Link from "next/link";
 
 export default function PricingSuccessPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const checkoutId = searchParams.get("checkout_id");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // Give Polar a moment to process the webhook
@@ -82,7 +81,7 @@ export default function PricingSuccessPage() {
                   onClick={() => router.push("/")}
                   className="flex-1"
                 >
-                  Retour à l'accueil
+                  Retour à l&apos;accueil
                 </Button>
               </div>
             </>

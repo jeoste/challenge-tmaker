@@ -36,7 +36,7 @@ export default function TermsPage() {
             <section>
               <h2 className="text-2xl font-semibold text-foreground mb-4">1. Acceptance of Terms</h2>
               <p className="text-muted-foreground leading-relaxed">
-                By accessing and using Unearth ("the Service"), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
+                By accessing and using Unearth (&quot;the Service&quot;), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
               </p>
             </section>
 
@@ -116,7 +116,7 @@ export default function TermsPage() {
             <section>
               <h2 className="text-2xl font-semibold text-foreground mb-4">8. Limitation of Liability</h2>
               <p className="text-muted-foreground leading-relaxed">
-                The Service is provided "as is" without warranties of any kind, either express or implied. Unearth shall not be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use or inability to use the Service.
+                The Service is provided &quot;as is&quot; without warranties of any kind, either express or implied. Unearth shall not be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use or inability to use the Service.
               </p>
             </section>
 

@@ -10,7 +10,7 @@ export async function GET() {
     if (redis) {
       try {
         cached = await redis.get(cacheKey);
-      } catch (error) {
+      } catch {
         // Redis not available, continue without cache (silent fallback)
       }
     }
@@ -38,7 +38,7 @@ export async function GET() {
       }
 
       totalPosts = data?.reduce((sum, log) => sum + (log.posts_found || 0), 0) || 0;
-    } catch (err: any) {
+    } catch {
       // Handle any other errors gracefully (silent fallback)
       return NextResponse.json({ postsScanned24h: 0 });
     }
@@ -47,13 +47,13 @@ export async function GET() {
     if (redis) {
       try {
         await redis.setex(cacheKey, 300, totalPosts.toString());
-      } catch (error) {
+      } catch {
         // Redis not available, continue without caching (silent fallback)
       }
     }
 
     return NextResponse.json({ postsScanned24h: totalPosts });
-  } catch (error) {
+  } catch {
     // Silent fallback: stats should never break pages.
     return NextResponse.json({ postsScanned24h: 0 });
   }

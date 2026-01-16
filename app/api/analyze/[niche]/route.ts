@@ -86,7 +86,7 @@ export async function GET(
     };
 
     return NextResponse.json(response);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Get analysis error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },

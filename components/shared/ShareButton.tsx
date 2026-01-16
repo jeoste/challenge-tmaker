@@ -28,9 +28,6 @@ export function ShareButton({ painPoint, niche, analysisId }: ShareButtonProps) 
       shareUrl = `${window.location.origin}/results/${encodeURIComponent(niche)}#pain-${painPoint.id}`;
     }
 
-    // Generate OG image URL (always accessible)
-    const ogImageUrl = `${window.location.origin}/api/og/${encodeURIComponent(niche)}?pain=${encodeURIComponent(painPoint.title)}&score=${painPoint.goldScore}`;
-
     // Share text optimized for Twitter/X
     const text = `🔥 ${painPoint.blueprint.solutionName}\n\nGold Score: ${painPoint.goldScore}/100\n\n${shareUrl}`;
 
@@ -44,9 +41,10 @@ export function ShareButton({ painPoint, niche, analysisId }: ShareButtonProps) 
         });
         toast.success('Partagé avec succès !');
         return;
-      } catch (error: any) {
+      } catch (error: unknown) {
         // User cancelled is not an error
-        if (error.name !== 'AbortError') {
+        const errorObj = error as { name?: string };
+        if (errorObj.name !== 'AbortError') {
           console.error('Share error:', error);
         } else {
           return; // User cancelled, don't show error

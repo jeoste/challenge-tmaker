@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Badge } from "./ui/badge";
-import { User, LogOut, Settings, LayoutDashboard } from "lucide-react";
+import { User, LogOut, Settings, LayoutDashboard, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -49,8 +49,14 @@ export const Header = () => {
     const index = navItems.findIndex(
       (item) => pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
     );
-    setActiveIndex(index >= 0 ? index : null);
-  }, [pathname]);
+    if (index >= 0) {
+      setActiveIndex(index);
+    } else if (user && (pathname === "/dashboard" || pathname.startsWith("/dashboard"))) {
+      setActiveIndex(navItems.length);
+    } else {
+      setActiveIndex(null);
+    }
+  }, [pathname, user]);
 
   // Animate ghost element
   useEffect(() => {
@@ -62,7 +68,10 @@ export const Header = () => {
       return;
     }
 
-    const link = linkRefs.current.get(navItems[activeIndex].href);
+    const targetHref = activeIndex < navItems.length 
+      ? navItems[activeIndex].href 
+      : '/dashboard';
+    const link = linkRefs.current.get(targetHref);
     if (!link) {
       ghost.style.opacity = '0';
       return;
@@ -139,7 +148,13 @@ export const Header = () => {
     const index = navItems.findIndex(
       (item) => pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
     );
-    setActiveIndex(index >= 0 ? index : null);
+    if (index >= 0) {
+      setActiveIndex(index);
+    } else if (user && (pathname === "/dashboard" || pathname.startsWith("/dashboard"))) {
+      setActiveIndex(navItems.length);
+    } else {
+      setActiveIndex(null);
+    }
   };
 
   return (
@@ -227,6 +242,35 @@ export const Header = () => {
                 </Link>
               );
             })}
+            
+            {user && (
+              <Link
+                href="/dashboard"
+                ref={(el) => {
+                  if (el) linkRefs.current.set('/dashboard', el);
+                }}
+                onMouseEnter={() => {
+                  const dashboardIndex = navItems.length;
+                  setActiveIndex(dashboardIndex);
+                }}
+                onMouseLeave={handleLinkMouseLeave}
+                className={cn(
+                  "relative text-sm font-medium transition-colors px-3 py-1.5 rounded-lg",
+                  "z-10",
+                  pathname === "/dashboard" || pathname.startsWith("/dashboard")
+                    ? "text-foreground"
+                    : "text-[hsl(210_40%_60%)] hover:text-[hsl(210_40%_75%)]"
+                )}
+                style={{
+                  transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+                  transitionDuration: '200ms',
+                  lineHeight: '1.2',
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                Dashboard
+              </Link>
+            )}
           </nav>
           
           <div className="flex items-center gap-4">
@@ -299,6 +343,17 @@ export const Header = () => {
                           Settings
                         </Link>
                       </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <a 
+                          href="https://insigh.to/b/unearth" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 cursor-pointer"
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                          Feedback
+                        </a>
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={handleSignOut}
@@ -321,7 +376,7 @@ export const Header = () => {
                           fontWeight: '500',
                         }}
                       >
-                        S'inscrire
+                        S&apos;inscrire
                       </Button>
                     </Link>
                     <Button

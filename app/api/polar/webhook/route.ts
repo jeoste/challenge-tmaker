@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { polar } from '@/lib/polar';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import crypto from 'crypto';
 
@@ -71,16 +70,33 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ received: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Webhook processing failed';
     console.error('[Polar Webhook] Error:', error);
     return NextResponse.json(
-      { error: error.message || 'Webhook processing failed' },
+      { error: errorMessage },
       { status: 500 }
     );
   }
 }
 
-async function handleSubscriptionUpdate(subscription: any) {
+interface PolarSubscription {
+  id: string;
+  customer_id: string;
+  status: string;
+  product?: { id: string };
+  current_period_start?: number;
+  current_period_end?: number;
+  cancel_at_period_end?: boolean;
+  metadata?: { user_id?: string };
+}
+
+interface PolarOrder {
+  id: string;
+  subscription_id?: string;
+}
+
+async function handleSubscriptionUpdate(subscription: PolarSubscription) {
   const userId = subscription.metadata?.user_id;
   if (!userId) {
     console.error('[Polar Webhook] No user_id in subscription metadata');
@@ -121,7 +137,7 @@ async function handleSubscriptionUpdate(subscription: any) {
   }
 }
 
-async function handleSubscriptionCanceled(subscription: any) {
+async function handleSubscriptionCanceled(subscription: PolarSubscription) {
   const userId = subscription.metadata?.user_id;
   if (!userId) {
     console.error('[Polar Webhook] No user_id in subscription metadata');
@@ -147,7 +163,7 @@ async function handleSubscriptionCanceled(subscription: any) {
   });
 }
 
-async function handleOrderPaid(order: any) {
+async function handleOrderPaid(order: PolarOrder) {
   // Order paid - subscription should already be active
   // This is mainly for logging/analytics
   console.log(`[Polar Webhook] Order paid: ${order.id}`);
@@ -168,7 +184,7 @@ async function handleOrderPaid(order: any) {
   }
 }
 
-async function handleSubscriptionPastDue(subscription: any) {
+async function handleSubscriptionPastDue(subscription: PolarSubscription) {
   const userId = subscription.metadata?.user_id;
   if (!userId) {
     console.error('[Polar Webhook] No user_id in subscription metadata');

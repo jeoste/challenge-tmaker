@@ -64,14 +64,20 @@ export async function GET(request: NextRequest) {
     }
 
     // Deduplicate analyses: keep only the most recent one for each (user_id, niche) combination
+    interface Analysis {
+      user_id: string;
+      niche: string;
+      scanned_at: string;
+      [key: string]: unknown;
+    }
     const uniqueAnalyses = Array.from(
       new Map(
-        data.map((analysis: any) => [
+        data.map((analysis: Analysis) => [
           `${analysis.user_id}-${analysis.niche.toLowerCase().trim()}`,
           analysis
         ])
       ).values()
-    ).sort((a: any, b: any) => 
+    ).sort((a: Analysis, b: Analysis) => 
       new Date(b.scanned_at).getTime() - new Date(a.scanned_at).getTime()
     );
 

@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Download, Share2 } from 'lucide-react';
 import Image from 'next/image';
+import { AnalyzeResponse, PainPoint } from '@/types';
 
 export default function SharePage() {
   const params = useParams();
@@ -12,7 +13,7 @@ export default function SharePage() {
   const searchParams = useSearchParams();
   const id = params.id as string;
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<AnalyzeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -67,7 +68,7 @@ export default function SharePage() {
   const painId = searchParams.get('pain');
   
   const selectedPain = painId
-    ? data.pains?.find((p: any) => p.id === painId) || data.pains?.[0]
+    ? data.pains?.find((p: PainPoint) => p.id === painId) || data.pains?.[0]
     : data.pains?.[0];
 
   if (!selectedPain || !data.pains || data.pains.length === 0) {
@@ -117,7 +118,7 @@ export default function SharePage() {
                 Sélectionner un pain point à partager :
               </p>
               <div className="flex flex-wrap gap-2 justify-center">
-                {data.pains.map((pain: any) => (
+                {data.pains.map((pain: PainPoint) => (
                   <Button
                     key={pain.id}
                     variant={selectedPain.id === pain.id ? 'default' : 'outline'}
@@ -168,7 +169,7 @@ export default function SharePage() {
               variant="ghost"
               onClick={() => router.push(`/results/${encodeURIComponent(data.niche)}`)}
             >
-              Voir l'analyse complète
+              Voir l&apos;analyse complète
             </Button>
           </div>
         </div>

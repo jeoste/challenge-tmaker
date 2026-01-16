@@ -26,16 +26,16 @@ export function LoginForm() {
       });
 
       if (error) {
-        toast.error(error.message || 'Erreur de connexion');
+        toast.error(error.message || 'Login error');
         return;
       }
 
-      toast.success('Connexion réussie');
+      toast.success('Login successful');
       const redirect = searchParams.get('redirect') || '/';
       router.push(redirect);
       router.refresh();
-    } catch (error) {
-      toast.error('Une erreur est survenue');
+    } catch {
+      toast.error('An error occurred');
     } finally {
       setLoading(false);
     }
@@ -48,7 +48,7 @@ export function LoginForm() {
         <Input
           id="email"
           type="email"
-          placeholder="votre@email.com"
+          placeholder="your@email.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -58,7 +58,7 @@ export function LoginForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password">Mot de passe</Label>
+        <Label htmlFor="password">Password</Label>
         <Input
           id="password"
           type="password"
@@ -76,7 +76,7 @@ export function LoginForm() {
         className="w-full bg-primary text-primary-foreground hover:opacity-90 transition-all"
         disabled={loading}
       >
-        {loading ? 'Connexion...' : 'Se connecter'}
+        {loading ? 'Logging in...' : 'Log In'}
       </Button>
     </form>
   );

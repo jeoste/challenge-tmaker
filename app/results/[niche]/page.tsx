@@ -8,7 +8,7 @@ import { PainPointCard } from '@/components/results/PainPointCard';
 import { Button } from '@/components/ui/button';
 import { AnalyzeResponse } from '@/types';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, RefreshCw, AlertCircle, LayoutDashboard } from 'lucide-react';
+import { ArrowLeft, RefreshCw, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
 
 export default function ResultsPage() {
@@ -17,6 +17,9 @@ export default function ResultsPage() {
   const searchParams = useSearchParams();
   const niche = decodeURIComponent(params.niche as string);
   const analysisId = searchParams.get('id');
+  const source = searchParams.get('source');
+  const problemType = searchParams.get('type');
+  const engagementLevel = searchParams.get('engagement');
   const { session, loading: authLoading } = useAuth();
   
   const [loading, setLoading] = useState(true);
@@ -53,7 +56,11 @@ export default function ResultsPage() {
       if (response.ok) {
         const favoritesData = await response.json();
         const favoriteSet = new Set<string>();
-        favoritesData.favorites?.forEach((f: any) => {
+        interface Favorite {
+          analysis_id: string;
+          pain_point_id: string;
+        }
+        favoritesData.favorites?.forEach((f: Favorite) => {
           if (f.analysis_id === data.id) {
             favoriteSet.add(f.pain_point_id);
           }
@@ -136,14 +143,25 @@ export default function ResultsPage() {
           // Continue to create new analysis
         }
 
-        // Create new analysis
+        // Create new analysis with query params
+        interface RequestBody {
+          niche: string;
+          source?: string;
+          problemType?: string;
+          engagementLevel?: string;
+        }
+        const requestBody: RequestBody = { niche };
+        if (source) requestBody.source = source;
+        if (problemType) requestBody.problemType = problemType;
+        if (engagementLevel) requestBody.engagementLevel = engagementLevel;
+
         const response = await fetch('/api/analyze', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ niche }),
+          body: JSON.stringify(requestBody),
         });
 
         if (!response.ok) {
@@ -193,10 +211,11 @@ export default function ResultsPage() {
         } else {
           console.log('Analysis not saved (user not authenticated or save failed)');
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.';
         console.error('Error fetching results:', err);
         setError('Erreur de connexion');
-        setErrorDetails(err.message || 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.');
+        setErrorDetails(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -301,7 +320,7 @@ export default function ResultsPage() {
                     const result = await response.json();
                     setData(result);
                     setLoading(false);
-                  } catch (err: any) {
+                  } catch (err: unknown) {
                     console.error('Error retrying fetch:', err);
                     setError('Erreur de connexion');
                     setErrorDetails(err.message || 'Impossible de se connecter au serveur.');
@@ -330,7 +349,7 @@ export default function ResultsPage() {
               Aucun pain point trouvé
             </h2>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Aucune opportunité SaaS n'a été trouvée pour cette niche. 
+              Aucune opportunité SaaS n&apos;a été trouvée pour cette niche. 
               Essayez une autre niche ou vérifiez plus tard.
             </p>
             {data && (
@@ -437,7 +456,7 @@ export default function ResultsPage() {
                         setError('Erreur lors de la nouvelle analyse');
                         setErrorDetails(errorData.error || 'Une erreur est survenue.');
                       }
-                    } catch (err: any) {
+                    } catch (err: unknown) {
                       setError('Erreur de connexion');
                       setErrorDetails(err.message || 'Impossible de se connecter au serveur.');
                     } finally {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Check, Clock } from 'lucide-react';
 
 interface Task {
@@ -42,37 +42,52 @@ function useTypewriter(text: string, speed: number = 30, isActive: boolean) {
 }
 
 export function LoadingState({ totalTasks = 4 }: LoadingStateProps) {
-  const [tasks, setTasks] = useState<Task[]>([
-    { id: '1', label: 'Accessing Reddit subreddits...', fullLabel: 'Accessing Reddit subreddits...', status: 'pending', displayedText: '' },
+  const initialTasks: Task[] = [
+    { id: '1', label: 'Accessing data sources...', fullLabel: 'Accessing data sources...', status: 'pending', displayedText: '' },
     { id: '2', label: 'Extracting pain points...', fullLabel: 'Extracting pain points...', status: 'pending', displayedText: '' },
     { id: '3', label: 'LLM Scoring in progress...', fullLabel: 'LLM Scoring in progress...', status: 'pending', displayedText: '' },
     { id: '4', label: 'Generating blueprints...', fullLabel: 'Generating blueprints...', status: 'pending', displayedText: '' },
-  ]);
+  ];
+  const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [progress, setProgress] = useState(0);
+  const [mounted, setMounted] = useState(false);
+  const tasksRef = useRef<Task[]>(initialTasks);
+
+  // Update ref when tasks change
+  useEffect(() => {
+    tasksRef.current = tasks;
+  }, [tasks]);
+
+  // Prevent flash by ensuring component is mounted before showing
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
-    let taskTimeout: NodeJS.Timeout;
-    let progressInterval: NodeJS.Timeout;
+    if (!mounted) return;
+
+    const timeouts: NodeJS.Timeout[] = [];
 
     // Start first task after a short delay
-    taskTimeout = setTimeout(() => {
+    const firstTimeout = setTimeout(() => {
       setTasks((prev) => {
         const newTasks = [...prev];
         newTasks[0].status = 'in_progress';
         return newTasks;
       });
-    }, 800);
+    }, 500);
+    timeouts.push(firstTimeout);
 
-    // Progressively complete tasks
+    // Progressively complete tasks with longer delays to match backend processing
     const taskIntervals = [
-      { delay: 2000, taskIndex: 0 }, // Complete task 1
-      { delay: 4500, taskIndex: 1 }, // Start and complete task 2
-      { delay: 7000, taskIndex: 2 }, // Start and complete task 3
-      { delay: 9500, taskIndex: 3 }, // Start and complete task 4
+      { delay: 2500, taskIndex: 0 }, // Complete task 1
+      { delay: 5000, taskIndex: 1 }, // Start and complete task 2
+      { delay: 8000, taskIndex: 2 }, // Start and complete task 3
+      { delay: 12000, taskIndex: 3 }, // Start and complete task 4
     ];
 
     taskIntervals.forEach(({ delay, taskIndex }) => {
-      setTimeout(() => {
+      const timeout = setTimeout(() => {
         setTasks((prev) => {
           const newTasks = [...prev];
           
@@ -90,26 +105,43 @@ export function LoadingState({ totalTasks = 4 }: LoadingStateProps) {
           return newTasks;
         });
       }, delay);
+      timeouts.push(timeout);
     });
 
-    // Smooth progress bar animation
-    progressInterval = setInterval(() => {
+    // Smooth progress bar animation - use ref to read current tasks
+    const progressInterval = setInterval(() => {
+      const completedCount = tasksRef.current.filter((t) => t.status === 'completed').length;
+      const targetProgress = Math.min((completedCount / totalTasks) * 100, 95); // Cap at 95% until real completion
+      
       setProgress((prev) => {
-        const completedCount = tasks.filter((t) => t.status === 'completed').length;
-        const targetProgress = (completedCount / tasks.length) * 100;
-        
         if (prev < targetProgress) {
-          return Math.min(targetProgress, prev + 2);
+          return Math.min(targetProgress, prev + 1.5);
         }
         return prev;
       });
-    }, 100);
+    }, 150);
 
     return () => {
-      clearTimeout(taskTimeout);
+      timeouts.forEach(timeout => clearTimeout(timeout));
       clearInterval(progressInterval);
     };
-  }, []);
+  }, [mounted]);
+
+  // Prevent flash by not rendering until mounted
+  if (!mounted) {
+    return (
+      <div className="w-full max-w-2xl mx-auto space-y-6">
+        <div className="glass-card p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+            <h2 className="text-lg font-mono text-terminal">
+              Scan en cours...
+            </h2>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-6">

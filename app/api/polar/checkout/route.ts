@@ -46,9 +46,11 @@ export async function POST(request: NextRequest) {
           plan: 'monthly',
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If variantId fails, try with productId instead
-      if (error.message?.includes('variant') || error.status === 404) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStatus = (error as { status?: number })?.status;
+      if (errorMessage.includes('variant') || errorStatus === 404) {
         checkout = await polar.checkouts.create({
           productId: variantId,
           customerEmail: session.user.email!,
@@ -69,7 +71,7 @@ export async function POST(request: NextRequest) {
       checkoutUrl: checkout.url,
       checkoutId: checkout.id,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Polar Checkout] Error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to create checkout session' },

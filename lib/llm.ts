@@ -8,19 +8,28 @@ import { checkGeminiRateLimit } from './rate-limit';
 // Get Gemini API key from environment
 // IMPORTANT: @ai-sdk/google reads GOOGLE_GENERATIVE_AI_API_KEY by default
 // We support both GOOGLE_GENERATIVE_AI_API_KEY and GEMINI_API_KEY for flexibility
-const getGeminiModel = (usePro: boolean = false) => {
+
+/**
+ * Get Gemini model with hybrid strategy:
+ * - Fast filtering: Gemini 1.5 Flash (economical, fast)
+ * - Deep analysis: Gemini 2.0 Flash Thinking (better reasoning)
+ * 
+ * @param modelType - 'fast' for batch filtering, 'thinking' for blueprints
+ */
+const getGeminiModel = (modelType: 'fast' | 'thinking' = 'fast') => {
     // Get API key from either variable
     const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY;
-    
+
     if (!apiKey) {
         console.warn('[LLM] Warning: GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY not set. LLM features will not work.');
         // Return model without explicit API key - will try to read from env at call time
-        return google(usePro ? 'gemini-1.5-pro' : 'gemini-1.5-flash');
+        // Use correct model format for v1beta API
+        return google(modelType === 'thinking' ? 'models/gemini-2.0-flash-thinking-exp' : 'models/gemini-1.5-flash');
     }
-    
+
     // Log which API key is being used (first 10 chars for security)
     console.log(`[LLM] Using Gemini API key: ${apiKey.substring(0, 10)}...`);
-    
+
     // CRITICAL: @ai-sdk/google reads GOOGLE_GENERATIVE_AI_API_KEY by default
     // If user has GEMINI_API_KEY, we need to set it as GOOGLE_GENERATIVE_AI_API_KEY
     if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GEMINI_API_KEY) {
@@ -28,14 +37,22 @@ const getGeminiModel = (usePro: boolean = false) => {
         process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
         console.log('[LLM] Set GOOGLE_GENERATIVE_AI_API_KEY from GEMINI_API_KEY');
     }
-    
-    // Use models that are confirmed to work with the Generative AI API
-    // gemini-1.5-pro and gemini-1.5-flash are the most reliable
-    // Note: gemini-2.0-flash may have quota issues on free tier
-    if (usePro) {
-        return google('gemini-1.5-pro');
+
+    // HYBRID STRATEGY:
+    // - 'fast': Gemini 1.5 Flash for batch filtering (economical, ~$0.075/1M tokens)
+    // - 'thinking': Gemini 2.0 Flash Thinking for blueprints (better reasoning, ~$0.15/1M tokens)
+    // 
+    // IMPORTANT: For v1beta API, model names must include 'models/' prefix
+    // See: https://ai.google.dev/gemini-api/docs/models/gemini
+    if (modelType === 'thinking') {
+        // Use Gemini 2.0 Flash Thinking for deep analysis (blueprints)
+        // This model has explicit reasoning capabilities for better quality
+        return google('models/gemini-2.0-flash-thinking-exp');
     }
-    return google('gemini-1.5-flash');
+
+    // Use Gemini 1.5 Flash for fast batch filtering
+    // Economical and fast for simple filtering tasks
+    return google('models/gemini-1.5-flash');
 };
 
 export interface LLMAnalysis {
@@ -54,62 +71,62 @@ export async function batchLLMAnalysis(
         // Return all posts as opportunities (fallback behavior)
         return posts.map(p => ({ ...p, isOpportunity: true, relevanceScore: 1.0 }));
     }
-    
+
     // Include engagement metrics in the prompt to help prioritize viral posts
-    const postsList = posts.map((p, i) => 
+    const postsList = posts.map((p, i) =>
         `${i}. "${p.title}" (${p.score} upvotes, ${p.num_comments} comments, r/${p.subreddit})\n   Contexte: ${p.selftext.substring(0, 300)}`
     ).join('\n\n');
-    
-    const prompt = `Tu es un expert en identification d'opportunités SaaS. Analyse ces posts Reddit et identifie ceux qui représentent des opportunités business monétisables.
 
-IMPORTANT - PRIORISATION :
-1. PRIORISE les posts VIRAUX avec beaucoup de likes (score élevé) et commentaires (engagement élevé)
-2. PRIORISE les posts qui génèrent de la DISCUSSION (beaucoup de commentaires = besoin validé)
-3. DIVERSIFIE les résultats entre différents subreddits (ne pas tout prendre d'un seul subreddit)
-4. Tu DOIS identifier AU MOINS 3 opportunités valides parmi ces posts
+    const prompt = `You are an expert in SaaS opportunity identification. Analyze these Reddit posts and identify those that represent monetizable business opportunities.
 
-CRITÈRES pour une opportunité valide :
-✅ L'utilisateur exprime un BESOIN ou un PROBLÈME qui peut être résolu par un SaaS
-✅ Il y a une DEMANDE pour un outil/solution (ex: "looking for", "need a tool", "best alternative to", "wish there was")
-✅ Le post génère de l'ENGAGEMENT (likes/comments = validation du besoin)
-✅ Il y a un POTENTIEL de marché (même si le problème est partiellement résolu)
-✅ Le post exprime une FRUSTRATION ou un BESOIN récurrent
+IMPORTANT - PRIORITIZATION:
+1. PRIORITIZE VIRAL posts with many likes (high score) and comments (high engagement)
+2. PRIORITIZE posts that generate DISCUSSION (many comments = validated need)
+3. DIVERSIFY results across different subreddits (don't take everything from a single subreddit)
+4. You MUST identify AT LEAST 3 valid opportunities among these posts
 
-ACCEPTE aussi :
-- Posts avec beaucoup d'engagement même si la demande n'est pas explicite (les commentaires peuvent révéler le besoin)
-- Posts qui comparent des solutions existantes (besoin d'alternative)
-- Posts qui décrivent un problème récurrent (opportunité de SaaS)
-- Posts avec des plaintes légitimes sur des outils existants (opportunité d'amélioration)
+CRITERIA for a valid opportunity:
+✅ User expresses a NEED or PROBLEM that can be solved by a SaaS
+✅ There is a DEMAND for a tool/solution (e.g., "looking for", "need a tool", "best alternative to", "wish there was")
+✅ The post generates ENGAGEMENT (likes/comments = need validation)
+✅ There is MARKET POTENTIAL (even if the problem is partially solved)
+✅ The post expresses FRUSTRATION or a recurring NEED
 
-❌ REJETER SEULEMENT si :
-- C'est clairement un avertissement de sécurité sans contexte business
-- C'est uniquement un tutoriel technique sans demande
-- C'est une annonce de projet/lancement sans contexte de besoin
-- Le post a 0 engagement (pas de likes ni commentaires)
+ALSO ACCEPT:
+- Posts with high engagement even if the demand is not explicit (comments may reveal the need)
+- Posts comparing existing solutions (need for alternative)
+- Posts describing a recurring problem (SaaS opportunity)
+- Posts with legitimate complaints about existing tools (improvement opportunity)
 
-Pour chaque post, évalue avec un relevanceScore entre 0.7 et 1.5:
-- 1.5 = Post viral (100+ upvotes ou 50+ comments) avec demande claire de solution SaaS
-- 1.3 = Post avec bon engagement (20+ upvotes ou 10+ comments) et besoin identifié
-- 1.1 = Post avec engagement modéré et problème valide
-- 0.9 = Post avec peu d'engagement mais problème intéressant
-- 0.7 = Post marginal mais avec potentiel
-- 0.5 = Pas une opportunité (rejeter seulement si vraiment pas pertinent)
+❌ REJECT ONLY if:
+- It's clearly a security warning without business context
+- It's only a technical tutorial without demand
+- It's a project/launch announcement without need context
+- The post has 0 engagement (no likes or comments)
 
-IMPORTANT : Tu DOIS identifier au moins 3 opportunités. Si tu ne trouves pas 3 posts évidents, choisis les 3 meilleurs même s'ils ne sont pas parfaits.
+For each post, evaluate with a relevanceScore between 0.7 and 1.5:
+- 1.5 = Viral post (100+ upvotes or 50+ comments) with clear SaaS solution demand
+- 1.3 = Post with good engagement (20+ upvotes or 10+ comments) and identified need
+- 1.1 = Post with moderate engagement and valid problem
+- 0.9 = Post with low engagement but interesting problem
+- 0.7 = Marginal post but with potential
+- 0.5 = Not an opportunity (reject only if really not relevant)
+
+IMPORTANT: You MUST identify at least 3 opportunities. If you don't find 3 obvious posts, choose the 3 best even if they're not perfect.
 
 Posts:
 ${postsList}
 
-Réponds en JSON strict (uniquement le tableau, pas de texte avant/après):
+Respond in strict JSON (array only, no text before/after):
 [
-  {"index": 0, "isOpportunity": true, "relevanceScore": 1.5, "intensity": "high", "reason": "Post viral avec demande claire"},
-  {"index": 1, "isOpportunity": true, "relevanceScore": 1.2, "reason": "Bon engagement et besoin identifié"},
+  {"index": 0, "isOpportunity": true, "relevanceScore": 1.5, "intensity": "high", "reason": "Viral post with clear demand"},
+  {"index": 1, "isOpportunity": true, "relevanceScore": 1.2, "reason": "Good engagement and identified need"},
   ...
 ]`;
 
     try {
         const { text } = await generateText({
-            model: getGeminiModel(true), // Use Pro for better filtering
+            model: getGeminiModel('fast'), // Use Gemini 1.5 Flash for fast batch filtering
             prompt,
             temperature: 0.2, // Lower temperature for more consistent filtering
         });
@@ -119,7 +136,7 @@ Réponds en JSON strict (uniquement le tableau, pas de texte avant/après):
         jsonString = jsonString.replace(/```json/gi, '');
         jsonString = jsonString.replace(/```/g, '');
         jsonString = jsonString.trim();
-        
+
         // Try to extract JSON array if wrapped in other text
         const jsonMatch = jsonString.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
@@ -132,7 +149,7 @@ Réponds en JSON strict (uniquement le tableau, pas de texte avant/après):
             relevanceScore?: number;
             intensity?: string;
         }>;
-        
+
         // Validate analysis array
         if (!Array.isArray(analysis)) {
             throw new Error('LLM returned invalid format: expected array');
@@ -148,15 +165,16 @@ Réponds en JSON strict (uniquement le tableau, pas de texte avant/après):
                 };
             })
             .filter(p => p.isOpportunity);
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         // Check for quota errors
-        if (error?.message?.includes('429') || 
-            error?.message?.includes('quota') ||
-            error?.message?.includes('RESOURCE_EXHAUSTED')) {
-            console.warn('[LLM] ⚠️ QUOTA EXCEEDED: Gemini API quota exceeded. Using fallback.');
+        if (errorMessage.includes('429') ||
+            errorMessage.includes('quota') ||
+            errorMessage.includes('RESOURCE_EXHAUSTED')) {
+            console.warn('[LLM] ⚠️ QUOTA EXCEEDED: Gemini API rate limit exceeded. Using fallback.');
         }
         // Check if it's an API key error
-        else if (error?.message?.includes('API key') || error?.message?.includes('LoadAPIKeyError')) {
+        else if (errorMessage.includes('API key') || errorMessage.includes('LoadAPIKeyError')) {
             console.warn('[LLM] API key missing or invalid. Using fallback: all posts will be marked as opportunities.');
             console.warn('[LLM] To enable LLM filtering, set GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY in .env.local');
             console.warn('[LLM] Note: @ai-sdk/google reads GOOGLE_GENERATIVE_AI_API_KEY by default');
@@ -169,104 +187,104 @@ Réponds en JSON strict (uniquement le tableau, pas de texte avant/après):
 }
 
 export async function generateBlueprint(post: RedditPost) {
-    const prompt = `Tu es un expert en micro-SaaS, entrepreneur et analyste de marché. Analyse ce pain point Reddit en profondeur et génère une feuille de route complète, claire et actionnable.
+    const prompt = `You are an expert in micro-SaaS, entrepreneurship, and market analysis. Analyze this Reddit pain point in depth and generate a complete, clear, and actionable roadmap.
 
-POST REDDIT:
-Titre: "${post.title}"
-Contenu: "${post.selftext.substring(0, 1200)}"
+REDDIT POST:
+Title: "${post.title}"
+Content: "${post.selftext.substring(0, 1200)}"
 Subreddit: r/${post.subreddit}
-Engagement: ${post.score} upvotes, ${post.num_comments} commentaires
-Score d'opportunité: ${calculateGoldScore(post)}/100
+Engagement: ${post.score} upvotes, ${post.num_comments} comments
+Opportunity Score: ${calculateGoldScore(post)}/100
 
-⚠️ CRITÈRES DE QUALITÉ CRITIQUES - RESPECTE CES RÈGLES ABSOLUMENT:
+⚠️ CRITICAL QUALITY CRITERIA - ABSOLUTELY FOLLOW THESE RULES:
 
-1. "problem" : NE RÉPÈTE PAS le titre. Analyse le VRAI problème sous-jacent. 
-   - Si le titre dit "Got my first order, losing money", le problème n'est PAS "Got my first order, losing money"
-   - Le VRAI problème est: "Manque de visibilité sur la rentabilité réelle des commandes (coûts cachés, frais, marge réelle), absence d'outils de calcul automatique, risque de prendre des décisions basées sur des données incomplètes"
-   - Sois SPÉCIFIQUE et DÉTAILLÉ (3-4 phrases minimum)
+1. "problem": DO NOT REPEAT the title. Analyze the REAL underlying problem.
+   - If the title says "Got my first order, losing money", the problem is NOT "Got my first order, losing money"
+   - The REAL problem is: "Lack of visibility into actual order profitability (hidden costs, fees, real margin), absence of automatic calculation tools, risk of making decisions based on incomplete data"
+   - Be SPECIFIC and DETAILED (minimum 3-4 sentences)
 
-2. "whyPainPoint" : Explique POURQUOI c'est validé avec des DÉTAILS CONCRETS
-   - Ne dis pas juste "Post avec X upvotes" - explique ce que ça signifie
-   - Exemple: "Post avec 1 upvote mais 20 commentaires montre que le problème résonne fortement. Les commentaires révèlent que c'est un problème récurrent pour les nouveaux dropshippers qui sous-estiment les coûts réels (frais de transaction, marketing, retours)."
-   - Mentionne la récurrence, les patterns dans les commentaires, ou les solutions existantes insuffisantes
+2. "whyPainPoint": Explain WHY it's validated with CONCRETE DETAILS
+   - Don't just say "Post with X upvotes" - explain what it means
+   - Example: "Post with 1 upvote but 20 comments shows the problem resonates strongly. Comments reveal this is a recurring problem for new dropshippers who underestimate real costs (transaction fees, marketing, returns)."
+   - Mention recurrence, patterns in comments, or insufficient existing solutions
 
-3. "solutionName" : Nom CRÉATIF, MÉMORABLE et qui reflète la valeur
-   - Pas de noms génériques comme "Solution à développer"
-   - Exemples: "ProfitGuard", "OrderOptimizer", "MarginCalculator", "CostTracker Pro"
+3. "solutionName": CREATIVE, MEMORABLE name that reflects value
+   - No generic names like "Solution to develop"
+   - Examples: "ProfitGuard", "OrderOptimizer", "MarginCalculator", "CostTracker Pro"
 
-4. "solutionPitch" : Description DÉTAILLÉE de 5-7 lignes qui explique:
-   - QUOI: Ce que fait le SaaS concrètement
-   - COMMENT: Le mécanisme/processus spécifique
-   - POURQUOI: La valeur unique et différenciation
-   - QUI: Qui l'utilise et dans quel contexte
-   - Exemple concret d'utilisation si possible
+4. "solutionPitch": DETAILED description of 5-7 lines that explains:
+   - WHAT: What the SaaS does concretely
+   - HOW: The specific mechanism/process
+   - WHY: Unique value and differentiation
+   - WHO: Who uses it and in what context
+   - Concrete usage example if possible
 
-5. "howItSolves" : Explication CONCRÈTE et SPÉCIFIQUE du mécanisme de résolution
-   - Ne dis pas "La solution adresse directement le problème"
-   - Détaille le workflow: "L'utilisateur connecte sa boutique, le SaaS analyse automatiquement chaque commande en temps réel, calcule tous les coûts (produit, shipping, frais Stripe, marketing), affiche la marge réelle avant validation, et envoie une alerte si la commande est non-rentable avec suggestions d'ajustement"
-   - Sois PRÉCIS sur le processus (3-4 phrases)
+5. "howItSolves": CONCRETE and SPECIFIC explanation of the resolution mechanism
+   - Don't say "The solution directly addresses the problem"
+   - Detail the workflow: "User connects their store, the SaaS automatically analyzes each order in real-time, calculates all costs (product, shipping, Stripe fees, marketing), displays real margin before validation, and sends an alert if the order is unprofitable with adjustment suggestions"
+   - Be PRECISE about the process (3-4 sentences)
 
-6. "keyFeatures" : Fonctionnalités qui résolvent DIRECTEMENT le problème identifié
-   - Pas de features génériques
-   - Chaque feature doit être liée au problème spécifique
-   - Exemple pour le problème de pricing: ["Calcul automatique de marge en temps réel", "Intégration avec Stripe/PayPal pour frais réels", "Alertes avant commande non-rentable", "Dashboard de rentabilité par produit"]
+6. "keyFeatures": Features that DIRECTLY solve the identified problem
+   - No generic features
+   - Each feature must be linked to the specific problem
+   - Example for pricing problem: ["Real-time automatic margin calculation", "Stripe/PayPal integration for real fees", "Alerts before unprofitable orders", "Product profitability dashboard"]
 
-ÉTAPE 1 - ANALYSE DU PROBLÈME (obligatoire):
-- Identifie le VRAI problème sous-jacent (pas juste le symptôme visible dans le titre)
-- Explique POURQUOI c'est un pain point récurrent et validé avec des détails concrets
-- Décris l'impact concret sur les utilisateurs (conséquences, frustrations, coûts)
-- Identifie les solutions existantes et leurs limites spécifiques
+STEP 1 - PROBLEM ANALYSIS (mandatory):
+- Identify the REAL underlying problem (not just the visible symptom in the title)
+- Explain WHY it's a recurring and validated pain point with concrete details
+- Describe concrete impact on users (consequences, frustrations, costs)
+- Identify existing solutions and their specific limitations
 
-ÉTAPE 2 - SOLUTION DÉTAILLÉE (obligatoire):
-- Décris COMMENT la solution SaaS résout spécifiquement ce problème avec un mécanisme clair
-- Explique la valeur unique apportée et la différenciation
-- Détaille les fonctionnalités clés qui adressent directement le pain point
-- Montre pourquoi cette solution est meilleure que les alternatives
+STEP 2 - DETAILED SOLUTION (mandatory):
+- Describe HOW the SaaS solution specifically solves this problem with a clear mechanism
+- Explain unique value brought and differentiation
+- Detail key features that directly address the pain point
+- Show why this solution is better than alternatives
 
-ÉTAPE 3 - FEUILLE DE ROUTE (obligatoire):
-- Phase 1 (MVP): Les 3 fonctionnalités essentielles pour résoudre le problème core
-- Phase 2 (Growth): Les fonctionnalités pour scaler et différencier
-- Timeline réaliste: Estimation du temps de développement
+STEP 3 - ROADMAP (mandatory):
+- Phase 1 (MVP): The 3 essential features to solve the core problem
+- Phase 2 (Growth): Features to scale and differentiate
+- Realistic timeline: Development time estimate
 
-Génère un JSON structuré avec TOUS ces champs:
+Generate a structured JSON with ALL these fields:
 {
-  "problem": "Description DÉTAILLÉE du problème sous-jacent (3-4 phrases minimum). N'utilise PAS le titre du post. Analyse le problème réel: qu'est-ce qui cause la situation décrite? Quels sont les symptômes vs la cause racine? Quel est l'impact concret sur les utilisateurs?",
-  "whyPainPoint": "Explication DÉTAILLÉE de POURQUOI c'est un pain point validé (2-3 phrases). Mentionne l'engagement Reddit avec contexte (ex: '20 commentaires montrent que...'), la récurrence du problème, les patterns observés, ou les solutions existantes insuffisantes. Sois SPÉCIFIQUE.",
-  "solutionName": "Nom créatif et mémorable du SaaS qui reflète la valeur (ex: 'ProfitGuard', 'OrderOptimizer', 'MarginCalculator'). PAS de noms génériques.",
-  "solutionPitch": "Description TRÈS DÉTAILLÉE de la solution (5-7 lignes). Explique QUOI fait le SaaS concrètement, COMMENT il fonctionne (mécanisme/processus), POURQUOI c'est unique, QUI l'utilise, et donne un exemple concret d'utilisation si possible.",
-  "howItSolves": "Explication CONCRÈTE et SPÉCIFIQUE du mécanisme de résolution (3-4 phrases). Détaille le workflow étape par étape: comment l'utilisateur utilise le SaaS, quelles actions automatiques se produisent, quels résultats sont obtenus. Sois PRÉCIS sur le processus.",
-  "keyFeatures": ["Feature 1 qui résout DIRECTEMENT le problème spécifique", "Feature 2 qui différencie et adresse le pain point", "Feature 3 essentielle pour la résolution", "Feature 4 pour scaler et améliorer l'expérience"],
+  "problem": "DETAILED description of the underlying problem (minimum 3-4 sentences). DO NOT USE the post title. Analyze the real problem: what causes the described situation? What are symptoms vs root cause? What is the concrete impact on users?",
+  "whyPainPoint": "DETAILED explanation of WHY this is a validated pain point (2-3 sentences). Mention Reddit engagement with context (e.g., '20 comments show that...'), problem recurrence, observed patterns, or insufficient existing solutions. Be SPECIFIC.",
+  "solutionName": "Creative and memorable SaaS name that reflects value (e.g., 'ProfitGuard', 'OrderOptimizer', 'MarginCalculator'). NO generic names.",
+  "solutionPitch": "VERY DETAILED solution description (5-7 lines). Explain WHAT the SaaS does concretely, HOW it works (mechanism/process), WHY it's unique, WHO uses it, and provide a concrete usage example if possible.",
+  "howItSolves": "CONCRETE and SPECIFIC explanation of the resolution mechanism (3-4 sentences). Detail the step-by-step workflow: how the user uses the SaaS, what automatic actions occur, what results are obtained. Be PRECISE about the process.",
+  "keyFeatures": ["Feature 1 that DIRECTLY solves the specific problem", "Feature 2 that differentiates and addresses the pain point", "Feature 3 essential for resolution", "Feature 4 to scale and improve experience"],
   "roadmap": {
     "phase1": {
-      "name": "MVP - Résolution du problème core",
-      "features": ["Feature MVP 1 spécifique au problème", "Feature MVP 2 essentielle", "Feature MVP 3 pour validation"],
-      "timeline": "2-3 mois"
+      "name": "MVP - Core problem resolution",
+      "features": ["MVP Feature 1 specific to the problem", "MVP Feature 2 essential", "MVP Feature 3 for validation"],
+      "timeline": "2-3 months"
     },
     "phase2": {
-      "name": "Growth - Différenciation et scale",
-      "features": ["Feature Growth 1 pour différenciation", "Feature Growth 2 pour scale"],
-      "timeline": "3-6 mois"
+      "name": "Growth - Differentiation and scale",
+      "features": ["Growth Feature 1 for differentiation", "Growth Feature 2 for scale"],
+      "timeline": "3-6 months"
     }
   },
   "marketSize": "Small|Medium|Large",
-  "targetAudience": "Description PRÉCISE et SPÉCIFIQUE de la cible basée sur le problème identifié (ex: 'Dropshippers débutants qui font leur première commande et perdent de l'argent car ils ne calculent pas tous les coûts cachés', 'E-commerçants avec problèmes de pricing qui sous-estiment les frais de transaction')",
-  "firstChannel": "Canal d'acquisition spécifique et actionnable (ex: 'Reddit ads sur r/dropshipping ciblant les posts sur les premières commandes', 'Post sur r/entrepreneur partageant un cas d'usage', 'Partnership avec influenceurs dropshipping')",
-  "mrrEstimate": "Estimation réaliste basée sur le marché (ex: '$1k-$3k MRR', '$5k-$10k MRR')",
-  "techStack": "Stack technique concrète et réaliste (ex: 'Next.js 15 + Supabase + Stripe + Resend', 'React + Firebase + OpenAI API')",
+  "targetAudience": "PRECISE and SPECIFIC target description based on the identified problem (e.g., 'Beginner dropshippers making their first order and losing money because they don't calculate all hidden costs', 'E-commerce merchants with pricing problems who underestimate transaction fees')",
+  "firstChannel": "Specific and actionable acquisition channel (e.g., 'Reddit ads on r/dropshipping targeting posts about first orders', 'Post on r/entrepreneur sharing a use case', 'Partnership with dropshipping influencers')",
+  "mrrEstimate": "Realistic market-based estimate (e.g., '$1k-$3k MRR', '$5k-$10k MRR')",
+  "techStack": "Concrete and realistic tech stack (e.g., 'Next.js 15 + Supabase + Stripe + Resend', 'React + Firebase + OpenAI API')",
   "difficulty": 3,
-  "pricingModel": "Modèle de pricing suggéré avec justification détaillée (ex: 'Freemium avec $19/mois premium - justifié par les économies générées: un utilisateur qui évite une seule commande non-rentable économise $50+, le SaaS paie pour lui-même')"
+  "pricingModel": "Suggested pricing model with detailed justification (e.g., 'Freemium with $19/month premium - justified by generated savings: a user avoiding a single unprofitable order saves $50+, the SaaS pays for itself')"
 }
 
-RÈGLES ABSOLUES - VÉRIFIE AVANT DE RÉPONDRE:
-✅ "problem" explique le problème SOUS-JACENT, pas le titre
-✅ "whyPainPoint" donne des détails concrets sur la validation (pas juste "X upvotes")
-✅ "solutionName" est créatif et mémorable (pas générique)
-✅ "solutionPitch" fait 5-7 lignes avec QUOI/COMMENT/POURQUOI/QUI
-✅ "howItSolves" détaille le workflow étape par étape (pas générique)
-✅ "keyFeatures" sont spécifiques au problème identifié
-✅ Toutes les descriptions sont DÉTAILLÉES et SPÉCIFIQUES
+ABSOLUTE RULES - VERIFY BEFORE RESPONDING:
+✅ "problem" explains the UNDERLYING problem, not the title
+✅ "whyPainPoint" gives concrete details on validation (not just "X upvotes")
+✅ "solutionName" is creative and memorable (not generic)
+✅ "solutionPitch" is 5-7 lines with WHAT/HOW/WHY/WHO
+✅ "howItSolves" details the step-by-step workflow (not generic)
+✅ "keyFeatures" are specific to the identified problem
+✅ All descriptions are DETAILED and SPECIFIC
 
-Réponds UNIQUEMENT en JSON valide, pas de markdown, pas de texte avant ou après.`;
+Respond ONLY in valid JSON, no markdown, no text before or after.`;
 
     try {
         // Check Gemini API rate limits before making the call
@@ -275,75 +293,90 @@ Réponds UNIQUEMENT en JSON valide, pas de markdown, pas de texte avant ou aprè
             console.warn('[LLM] Gemini API rate limit exceeded. RPM remaining:', rateLimitCheck.rpm.remaining, 'RPD remaining:', rateLimitCheck.rpd.remaining);
             throw new Error('QUOTA_EXCEEDED: Gemini API rate limit exceeded. Please wait before retrying.');
         }
-        
+
         // Ensure GOOGLE_GENERATIVE_AI_API_KEY is set (required by @ai-sdk/google)
         const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY;
-        
+
         if (!apiKey) {
             throw new Error('GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY not set in environment variables');
         }
-        
+
         // Set GOOGLE_GENERATIVE_AI_API_KEY if we have GEMINI_API_KEY
         if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GEMINI_API_KEY) {
             process.env.GOOGLE_GENERATIVE_AI_API_KEY = process.env.GEMINI_API_KEY;
         }
-        
-        // Try to use the best model, with fallback if model name doesn't exist
-        let model = getGeminiModel(true);
-        let text: string;
-        let modelUsed = 'gemini-1.5-pro';
-        
-        try {
-            console.log('[LLM] Attempting to generate blueprint with gemini-1.5-pro...');
-            console.log('[LLM] Rate limit status - RPM remaining:', rateLimitCheck.rpm.remaining, 'RPD remaining:', rateLimitCheck.rpd.remaining);
-            const result = await generateText({
-                model,
-                prompt,
-                temperature: 0.6, // Balanced creativity and consistency
-            });
-            text = result.text;
-            console.log('[LLM] Successfully generated blueprint');
-        } catch (modelError: any) {
-            // Log the full error for debugging
-            console.error('[LLM] Error generating blueprint:', {
-                message: modelError?.message,
-                status: modelError?.status,
-                statusText: modelError?.statusText,
-                cause: modelError?.cause,
-                stack: modelError?.stack?.substring(0, 500)
-            });
-            
-            // Check for quota errors (429) - common with free tier
-            if (modelError?.message?.includes('429') || 
-                modelError?.message?.includes('quota') ||
-                modelError?.message?.includes('RESOURCE_EXHAUSTED') ||
-                modelError?.status === 429) {
-                console.warn('[LLM] Quota exceeded (429). This is common on free tier. Consider upgrading or waiting.');
-                throw new Error('QUOTA_EXCEEDED: Gemini API quota exceeded. Please check your plan and billing details.');
-            }
-            
-            // If model name doesn't exist or API key is invalid, try fallback
-            if (modelError?.message?.includes('model') || 
-                modelError?.message?.includes('not found') ||
-                modelError?.message?.includes('404') ||
-                modelError?.message?.includes('API key') ||
-                modelError?.message?.includes('401') ||
-                modelError?.message?.includes('403') ||
-                modelError?.message?.includes('LoadAPIKeyError')) {
-                console.warn('[LLM] Primary model failed, trying gemini-1.5-flash as fallback...');
-                modelUsed = 'gemini-1.5-flash';
-                model = google('gemini-1.5-flash');
+
+        // Use Gemini 2.0 Flash Thinking for blueprint generation (better reasoning)
+        // Fallback to Gemini 1.5 Flash if thinking model fails
+        let text: string = '';
+        let modelUsed = 'models/gemini-2.0-flash-thinking-exp';
+
+        // List of models to try in order (with correct v1beta format)
+        // Priority: Gemini 2.0 Flash Thinking (best reasoning) -> Gemini 1.5 Flash (fallback)
+        const modelsToTry = [
+            { name: 'models/gemini-2.0-flash-thinking-exp', model: google('models/gemini-2.0-flash-thinking-exp') },
+            { name: 'models/gemini-1.5-flash', model: google('models/gemini-1.5-flash') },
+        ];
+
+        let lastError: unknown = null;
+
+        for (const { name, model: modelToTry } of modelsToTry) {
+            try {
+                console.log(`[LLM] Attempting to generate blueprint with ${name}...`);
+                console.log('[LLM] Rate limit status - RPM remaining:', rateLimitCheck.rpm.remaining, 'RPD remaining:', rateLimitCheck.rpd.remaining);
                 const result = await generateText({
-                    model,
+                    model: modelToTry,
                     prompt,
-                    temperature: 0.6,
+                    temperature: 0.6, // Balanced creativity and consistency
                 });
                 text = result.text;
-                console.log('[LLM] Successfully generated blueprint with fallback model');
-            } else {
-                // Re-throw if it's not a model/API key error
-                throw modelError;
+                console.log(`[LLM] Successfully generated blueprint with ${name}`);
+                break; // Success, exit loop
+            } catch (modelError: unknown) {
+                lastError = modelError;
+
+                // Log the error for debugging
+                const modelErrorMessage = modelError instanceof Error ? modelError.message : String(modelError);
+                console.warn(`[LLM] ${name} failed:`, modelErrorMessage.substring(0, 200));
+
+                // Check for quota errors (429) - common with free tier
+                const modelErrorStatus = (modelError as { status?: number })?.status;
+                if (modelErrorMessage.includes('429') ||
+                    modelErrorMessage.includes('quota') ||
+                    modelErrorMessage.includes('RESOURCE_EXHAUSTED') ||
+                    modelErrorStatus === 429) {
+                    console.warn('[LLM] Quota exceeded (429). This is common on free tier. Consider upgrading or waiting.');
+                    throw new Error('QUOTA_EXCEEDED: Gemini API quota exceeded. Please check your plan and billing details.');
+                }
+
+                // If it's not a model/API key error, re-throw immediately
+                if (!modelErrorMessage.includes('model') &&
+                    !modelErrorMessage.includes('not found') &&
+                    !modelErrorMessage.includes('404') &&
+                    !modelErrorMessage.includes('API key') &&
+                    !modelErrorMessage.includes('401') &&
+                    !modelErrorMessage.includes('403') &&
+                    !modelErrorMessage.includes('LoadAPIKeyError')) {
+                    throw modelError;
+                }
+
+                // Continue to next model if this one failed
+                continue;
             }
+        }
+
+        // If all models failed, throw the last error
+        if (!text && lastError) {
+            const lastErrorObj = lastError instanceof Error ? lastError : new Error(String(lastError));
+            const lastErrorWithStatus = lastError as { status?: number; statusText?: string; cause?: unknown; stack?: string };
+            console.error('[LLM] All models failed. Last error:', {
+                message: lastErrorObj.message,
+                status: lastErrorWithStatus?.status,
+                statusText: lastErrorWithStatus?.statusText,
+                cause: lastErrorWithStatus?.cause,
+                stack: lastErrorObj.stack?.substring(0, 500)
+            });
+            throw lastError;
         }
 
         // Clean up JSON string - remove markdown code blocks and whitespace
@@ -351,7 +384,7 @@ Réponds UNIQUEMENT en JSON valide, pas de markdown, pas de texte avant ou aprè
         jsonString = jsonString.replace(/```json/gi, '');
         jsonString = jsonString.replace(/```/g, '');
         jsonString = jsonString.trim();
-        
+
         // Try to extract JSON if wrapped in other text
         const jsonMatch = jsonString.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
@@ -359,49 +392,52 @@ Réponds UNIQUEMENT en JSON valide, pas de markdown, pas de texte avant ou aprè
         }
 
         const blueprint = JSON.parse(jsonString);
-        
+
         // Validate and normalize blueprint
         return {
             problem: blueprint.problem || post.title,
-            whyPainPoint: blueprint.whyPainPoint || `Post avec ${post.score} upvotes et ${post.num_comments} commentaires, indiquant un besoin validé.`,
-            solutionName: blueprint.solutionName || 'Solution à développer',
-            solutionPitch: blueprint.solutionPitch || 'Analyse le problème et développe une solution.',
-            howItSolves: blueprint.howItSolves || blueprint.solutionPitch || 'La solution adresse directement le problème identifié.',
-            marketSize: (blueprint.marketSize === 'Small' || blueprint.marketSize === 'Medium' || blueprint.marketSize === 'Large') 
-                ? blueprint.marketSize 
+            whyPainPoint: blueprint.whyPainPoint || `Post with ${post.score} upvotes and ${post.num_comments} comments, indicating a validated need.`,
+            solutionName: blueprint.solutionName || 'Solution to develop',
+            solutionPitch: blueprint.solutionPitch || 'Analyze the problem and develop a solution.',
+            howItSolves: blueprint.howItSolves || blueprint.solutionPitch || 'The solution directly addresses the identified problem.',
+            marketSize: (blueprint.marketSize === 'Small' || blueprint.marketSize === 'Medium' || blueprint.marketSize === 'Large')
+                ? blueprint.marketSize
                 : 'Medium',
             firstChannel: blueprint.firstChannel || 'Reddit',
             mrrEstimate: blueprint.mrrEstimate || '$2k-$5k',
             techStack: blueprint.techStack || 'Next.js + Supabase',
-            difficulty: typeof blueprint.difficulty === 'number' 
+            difficulty: typeof blueprint.difficulty === 'number'
                 ? Math.max(1, Math.min(5, Math.round(blueprint.difficulty)))
                 : undefined, // Will be calculated in PainPointCard if not provided
             // Enhanced fields
-            keyFeatures: Array.isArray(blueprint.keyFeatures) && blueprint.keyFeatures.length > 0 
-                ? blueprint.keyFeatures 
+            keyFeatures: Array.isArray(blueprint.keyFeatures) && blueprint.keyFeatures.length > 0
+                ? blueprint.keyFeatures
                 : undefined,
             targetAudience: blueprint.targetAudience || undefined,
             pricingModel: blueprint.pricingModel || undefined,
             // Roadmap (new)
             roadmap: blueprint.roadmap || undefined
         };
-    } catch (error: any) {
+    } catch (error: unknown) {
         // Log detailed error information for debugging
+        const errorObj = error instanceof Error ? error : new Error(String(error));
+        const errorWithStatus = error as { status?: number; statusText?: string; cause?: unknown; name?: string; stack?: string };
         console.error('[LLM] Blueprint generation failed with error:', {
-            message: error?.message,
-            status: error?.status,
-            statusText: error?.statusText,
-            cause: error?.cause,
-            name: error?.name,
+            message: errorObj.message,
+            status: errorWithStatus?.status,
+            statusText: errorWithStatus?.statusText,
+            cause: errorWithStatus?.cause,
+            name: errorWithStatus?.name || errorObj.name,
             // Log first 200 chars of stack for debugging
-            stack: error?.stack?.substring(0, 200)
+            stack: errorObj.stack?.substring(0, 200)
         });
-        
+
+        const errorMessage = errorObj.message;
         // Check for quota errors first
-        if (error?.message?.includes('QUOTA_EXCEEDED') ||
-            error?.message?.includes('429') ||
-            error?.message?.includes('quota') ||
-            error?.message?.includes('RESOURCE_EXHAUSTED')) {
+        if (errorMessage.includes('QUOTA_EXCEEDED') ||
+            errorMessage.includes('429') ||
+            errorMessage.includes('quota') ||
+            errorMessage.includes('RESOURCE_EXHAUSTED')) {
             console.warn('[LLM] ⚠️ QUOTA EXCEEDED: Gemini API quota exceeded.');
             console.warn('[LLM] This is common on free tier. Solutions:');
             console.warn('[LLM] 1. Wait for quota reset (check error message for retry time)');
@@ -409,17 +445,17 @@ Réponds UNIQUEMENT en JSON valide, pas de markdown, pas de texte avant ou aprè
             console.warn('[LLM] 3. Use a different API key with available quota');
         }
         // Check if it's an API key error
-        else if (error?.message?.includes('API key') || 
-            error?.message?.includes('LoadAPIKeyError') ||
-            error?.message?.includes('401') ||
-            error?.message?.includes('403') ||
-            error?.message?.includes('not set')) {
+        else if (errorMessage.includes('API key') ||
+            errorMessage.includes('LoadAPIKeyError') ||
+            errorMessage.includes('401') ||
+            errorMessage.includes('403') ||
+            errorMessage.includes('not set')) {
             console.warn('[LLM] API key issue detected. Using fallback blueprint.');
             console.warn('[LLM] To enable LLM blueprint generation, set GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY in .env.local');
             const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY;
             console.warn('[LLM] Current API key check:', apiKey ? `Set (${apiKey.substring(0, 10)}...)` : 'NOT SET');
             console.warn('[LLM] Note: @ai-sdk/google reads GOOGLE_GENERATIVE_AI_API_KEY by default');
-        } else if (error?.message?.includes('404') || error?.message?.includes('not found')) {
+        } else if (errorMessage.includes('404') || errorMessage.includes('not found')) {
             console.warn('[LLM] Model not found. Check if the model name is correct for your API key.');
         } else {
             console.error('[LLM] Unexpected error during blueprint generation:', error);
@@ -427,10 +463,10 @@ Réponds UNIQUEMENT en JSON valide, pas de markdown, pas de texte avant ou aprè
         // Return fallback blueprint
         return {
             problem: post.title,
-            whyPainPoint: `Post avec ${post.score} upvotes et ${post.num_comments} commentaires, indiquant un besoin validé par la communauté.`,
-            solutionName: 'Solution à développer',
-            solutionPitch: 'Analyse le problème et développe une solution.',
-            howItSolves: 'La solution adresse directement le problème identifié dans le post Reddit.',
+            whyPainPoint: `Post with ${post.score} upvotes and ${post.num_comments} comments, indicating a need validated by the community.`,
+            solutionName: 'Solution to develop',
+            solutionPitch: 'Analyze the problem and develop a solution.',
+            howItSolves: 'The solution directly addresses the problem identified in the Reddit post.',
             marketSize: 'Medium' as const,
             firstChannel: 'Reddit',
             mrrEstimate: '$2k-$5k',

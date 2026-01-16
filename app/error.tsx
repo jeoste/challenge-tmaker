@@ -33,12 +33,12 @@ export default function Error({
 
           {/* Error Title */}
           <h1 className="text-2xl font-bold text-foreground mb-3">
-            Une erreur est survenue
+            An error occurred
           </h1>
 
           {/* Error Message */}
           <p className="text-muted-foreground mb-2">
-            {error.message || 'Une erreur inattendue s\'est produite.'}
+            {error.message || 'An unexpected error occurred.'}
           </p>
 
           {error.digest && (
@@ -54,21 +54,21 @@ export default function Error({
               className="flex items-center gap-2"
             >
               <RefreshCw className="h-4 w-4" />
-              Réessayer
+              Try Again
             </Button>
             <Button
               variant="outline"
               asChild
             >
               <Link href="/">
-                Retour à l'accueil
+                Back to Home
               </Link>
             </Button>
           </div>
 
           {/* Help Text */}
           <p className="text-xs text-muted-foreground mt-6">
-            Si le problème persiste, veuillez réessayer dans quelques instants.
+            If the problem persists, please try again in a few moments.
           </p>
         </div>
       </div>

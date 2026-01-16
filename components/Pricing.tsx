@@ -83,7 +83,7 @@ export const Pricing = () => {
       } else {
         throw new Error('No checkout URL received');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating checkout:', error);
       toast.error(error.message || 'Failed to start checkout process');
       setLoading(false);
@@ -102,7 +102,7 @@ export const Pricing = () => {
             Choose your plan
           </h2>
           <p className="text-muted-foreground text-lg md:text-xl max-w-2xl mx-auto">
-            Start with our free plan and upgrade to Pro when you're ready to unlock the full potential
+            Start with our free plan and upgrade to Pro when you&apos;re ready to unlock the full potential
           </p>
         </div>
 

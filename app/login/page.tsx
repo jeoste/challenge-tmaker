@@ -51,7 +51,7 @@ export default function LoginPage() {
           <LoginForm />
 
           <div className="mt-6 text-center text-sm text-muted-foreground">
-            Pas encore de compte ?{' '}
+            Pas encore de compte ?{" "}
             <Link
               href="/signup"
               className="text-primary hover:underline"

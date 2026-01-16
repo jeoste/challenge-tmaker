@@ -7,7 +7,7 @@ interface GoldScoreBadgeProps {
   size?: number;
 }
 
-export function GoldScoreBadge({ score, size = 64 }: GoldScoreBadgeProps) {
+export function GoldScoreBadge({ score }: GoldScoreBadgeProps) {
   const getScoreColor = () => {
     if (score >= 80) return {
       bg: 'bg-gradient-to-br from-green-500/20 to-emerald-500/20',

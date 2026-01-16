@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redis } from '@/lib/cache';
 import { checkRateLimit, checkSerperRateLimit, checkRapidApiRateLimit, isIPWhitelisted, checkGeminiRateLimit } from '@/lib/rate-limit';
-import { fetchRedditPosts, getSubredditsForNiche } from '@/lib/reddit';
+import { fetchRedditPosts, getSubredditsForNiche, RedditPost } from '@/lib/reddit';
 import { searchRedditViaSerper, serperResultToRedditPost } from '@/lib/serper';
 import { getSubredditInfo, searchRedditPosts, rapidApiPostToRedditPost } from '@/lib/rapidapi-reddit';
 import { quickFilter, calculateGoldScore } from '@/lib/scoring';
@@ -10,7 +10,7 @@ import { batchLLMAnalysis, generateBlueprint } from '@/lib/llm';
 import { supabaseAdmin, getServerSession, getUserPlan } from '@/lib/supabase-server';
 
 // Helper to remove duplicates based on title and selftext
-function removeDuplicates(posts: any[]) {
+function removeDuplicates(posts: RedditPost[]) {
     const seen = new Set();
     return posts.filter(post => {
         const key = `${post.title}-${post.selftext}`;
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { niche, forceNew } = body;
+        const { niche, forceNew, source, problemType, engagementLevel } = body;
 
         // Validate niche
         if (!niche || typeof niche !== 'string') {
@@ -63,6 +63,15 @@ export async function POST(request: NextRequest) {
                 { error: 'Niche parameter is required' },
                 { status: 400 }
             );
+        }
+
+        // Log filter parameters for future implementation
+        if (source || problemType || engagementLevel) {
+            console.log('[Filters] Request with filters:', {
+                source: source || 'not specified',
+                problemType: problemType || 'not specified',
+                engagementLevel: engagementLevel || 'not specified'
+            });
         }
 
         // If not forcing a new analysis, check if one exists
@@ -160,7 +169,7 @@ export async function POST(request: NextRequest) {
                 } else {
                     console.log(`[Cache] Cache miss for ${niche}, fetching fresh data`);
                 }
-            } catch (error) {
+            } catch {
                 // Redis not available, continue without cache
                 console.warn('Redis not available, skipping cache check');
             }
@@ -169,16 +178,26 @@ export async function POST(request: NextRequest) {
         // 3. Fetch Reddit data
         const subreddits = getSubredditsForNiche(niche);
         
-        // 3.0. Optionally enrich with RapidAPI (VERY limited - 50/month total)
-        // Use reddit3 for search and reddit34 for subreddit metadata
-        let subredditMetadata: Record<string, any> = {};
-        const rapidApiRateLimit = await checkRapidApiRateLimit(
+        // 3.1. Fetch from Reddit API directly (primary source)
+        const postsResults = await Promise.all(
+            subreddits.map(sub => fetchRedditPosts(sub, 'week'))
+        );
+        let posts = removeDuplicates(postsResults.flat());
+        
+        // 3.0. Optionally enrich with RapidAPI (VERY limited quotas)
+        // reddit3: 100/month (search posts, user data)
+        // reddit34: 50/month (subreddit metadata)
+        const subredditMetadata: Record<string, { subscribers?: number; [key: string]: unknown }> = {};
+        
+        // Check quota for reddit3 (search posts)
+        const rapidApiRateLimitReddit3 = await checkRapidApiRateLimit(
             `rapidapi:user:${userId}`,
             ipWhitelisted,
-            userPlan
+            userPlan,
+            'reddit3'
         );
         
-        if (rapidApiRateLimit.allowed && process.env.RAPID_API_KEY && subreddits.length > 0) {
+        if (rapidApiRateLimitReddit3.allowed && process.env.RAPID_API_KEY && subreddits.length > 0) {
             try {
                 // 3.0.1. Search posts using reddit3 (high-value operation)
                 // Use niche as search query on primary subreddit
@@ -205,14 +224,15 @@ export async function POST(request: NextRequest) {
                 // 3.0.2. Get subreddit metadata using reddit34 (only if premium and quota allows)
                 // For free users, skip metadata to conserve quota for search
                 if (userPlan === 'premium') {
-                    // Check if we still have quota after the search
-                    const rapidApiRateLimitAfter = await checkRapidApiRateLimit(
+                    // Check quota for reddit34 (separate from reddit3)
+                    const rapidApiRateLimitReddit34 = await checkRapidApiRateLimit(
                         `rapidapi:user:${userId}`,
                         ipWhitelisted,
-                        userPlan
+                        userPlan,
+                        'reddit34'
                     );
                     
-                    if (rapidApiRateLimitAfter.allowed) {
+                    if (rapidApiRateLimitReddit34.allowed) {
                         const subredditInfo = await getSubredditInfo(primarySubreddit);
                         if (subredditInfo) {
                             subredditMetadata[primarySubreddit] = subredditInfo;
@@ -230,15 +250,9 @@ export async function POST(request: NextRequest) {
             if (!process.env.RAPID_API_KEY) {
                 console.log('[RapidAPI] RAPID_API_KEY not configured. Skipping RapidAPI enrichment.');
             } else {
-                console.log(`[RapidAPI] Rate limit exceeded. Remaining: ${rapidApiRateLimit.remaining}. Skipping RapidAPI enrichment.`);
+                console.log(`[RapidAPI] Rate limit exceeded for reddit3. Remaining: ${rapidApiRateLimitReddit3.remaining}. Skipping RapidAPI enrichment.`);
             }
         }
-        
-        // 3.1. Fetch from Reddit API directly (primary source)
-        const postsResults = await Promise.all(
-            subreddits.map(sub => fetchRedditPosts(sub, 'week'))
-        );
-        let posts = removeDuplicates(postsResults.flat());
         
         // 3.2. Enrich with Serper API (if rate limit allows and API key is configured)
         const serperRateLimit = await checkSerperRateLimit(
@@ -297,7 +311,7 @@ export async function POST(request: NextRequest) {
         const filtered = posts.filter(quickFilter);
 
         // 4.5. Group similar posts for counting
-        function groupSimilarPosts(posts: any[]): Map<string, number> {
+        function groupSimilarPosts(posts: RedditPost[]): Map<string, number> {
             const groups = new Map<string, number>();
             const processed = new Set<string>();
 
@@ -344,7 +358,7 @@ export async function POST(request: NextRequest) {
             .slice(0, 20);  // Top 20 for LLM analysis
 
         // 6. LLM batch analysis
-        let llmFiltered: Array<any & { relevanceScore: number }> = [];
+        let llmFiltered: Array<RedditPost & { relevanceScore: number; isOpportunity: boolean; similarPostsCount?: number }> = [];
         if (scored.length > 0) {
             llmFiltered = await batchLLMAnalysis(scored);
         } else {
@@ -379,7 +393,7 @@ export async function POST(request: NextRequest) {
             
             // Take top post from each subreddit, then fill with best overall
             const topBySubreddit: typeof scored = [];
-            subredditGroups.forEach((posts, subreddit) => {
+            subredditGroups.forEach((posts) => {
                 const top = posts.sort((a, b) => {
                     const aEng = (a.score * 1.0) + (a.num_comments * 3.0);
                     const bEng = (b.score * 1.0) + (b.num_comments * 3.0);
@@ -475,8 +489,8 @@ export async function POST(request: NextRequest) {
         console.log(`[Plan] Generating ${topResults.length} blueprints for ${userPlan} plan (RPM: ${geminiRateLimit.rpm.remaining}, RPD: ${geminiRateLimit.rpd.remaining})`);
         
         // Serialize blueprint generation with delays to respect rate limits
-        // Delay between calls: 15 seconds (to stay under 4 RPM = 1 call per 15 seconds)
-        const DELAY_BETWEEN_CALLS_MS = 15000; // 15 seconds = 4 calls per minute
+        // Delay between calls: 12 seconds (to stay under 5 RPM = 1 call per 12 seconds)
+        const DELAY_BETWEEN_CALLS_MS = 12000; // 12 seconds = 5 calls per minute
         
         const pains = [];
         for (let index = 0; index < topResults.length; index++) {
@@ -515,10 +529,11 @@ export async function POST(request: NextRequest) {
                     console.log(`[Gemini Rate Limit] Waiting ${DELAY_BETWEEN_CALLS_MS}ms before next blueprint generation...`);
                     await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CALLS_MS));
                 }
-            } catch (error: any) {
-                console.error(`[Gemini Rate Limit] Error generating blueprint for post ${index}:`, error?.message);
+            } catch (error: unknown) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                console.error(`[Gemini Rate Limit] Error generating blueprint for post ${index}:`, errorMessage);
                 // If it's a quota error, stop generating more blueprints
-                if (error?.message?.includes('QUOTA_EXCEEDED') || error?.message?.includes('rate limit')) {
+                if (errorMessage.includes('QUOTA_EXCEEDED') || errorMessage.includes('rate limit')) {
                     console.warn(`[Gemini Rate Limit] Stopping blueprint generation due to quota error`);
                     break;
                 }
@@ -538,10 +553,10 @@ export async function POST(request: NextRequest) {
                     permalink: redditUrl,
                     blueprint: {
                         problem: post.title,
-                        whyPainPoint: `Post avec ${post.score} upvotes et ${post.num_comments} commentaires, indiquant un besoin validé par la communauté.`,
-                        solutionName: 'Solution à développer',
-                        solutionPitch: 'Analyse le problème et développe une solution.',
-                        howItSolves: 'La solution adresse directement le problème identifié dans le post Reddit.',
+                        whyPainPoint: `Post with ${post.score} upvotes and ${post.num_comments} comments, indicating a need validated by the community.`,
+                        solutionName: 'Solution to develop',
+                        solutionPitch: 'Analyze the problem and develop a solution.',
+                        howItSolves: 'The solution directly addresses the problem identified in the Reddit post.',
                         marketSize: 'Medium' as const,
                         firstChannel: 'Reddit',
                         mrrEstimate: '$2k-$5k',
@@ -565,7 +580,7 @@ export async function POST(request: NextRequest) {
             try {
                 await redis.setex(cacheKey, 900, JSON.stringify(result)); // 15 minutes = 900 seconds
                 console.log(`[Cache] Cached results for ${niche} with 15min TTL`);
-            } catch (error) {
+            } catch {
                 // Redis not available, continue without caching
                 console.warn('Redis not available, skipping cache write');
             }
