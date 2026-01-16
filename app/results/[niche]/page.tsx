@@ -23,6 +23,7 @@ export default function ResultsPage() {
   const { session, loading: authLoading } = useAuth();
   
   const [loading, setLoading] = useState(true);
+  const [isCreatingNewAnalysis, setIsCreatingNewAnalysis] = useState(false);
   const [data, setData] = useState<AnalyzeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
@@ -96,8 +97,9 @@ export default function ResultsPage() {
         setError(null);
         setErrorDetails(null);
 
-        // If analysisId is provided, fetch that specific analysis
+        // If analysisId is provided, fetch that specific analysis (from dashboard)
         if (analysisId) {
+          setIsCreatingNewAnalysis(false); // Not creating, just loading existing
           console.log('Fetching analysis by ID:', analysisId, 'for niche:', niche);
           const analysisResponse = await fetch(
             `/api/analyze/id/${analysisId}`,
@@ -136,6 +138,7 @@ export default function ResultsPage() {
         }
 
         // Otherwise, try to fetch existing analysis from database by niche
+        setIsCreatingNewAnalysis(false); // Not creating yet, trying to load existing
         console.log('Fetching existing analysis by niche:', niche);
         const existingAnalysisResponse = await fetch(
           `/api/analyze/${encodeURIComponent(niche)}`,
@@ -166,6 +169,8 @@ export default function ResultsPage() {
           // Continue to create new analysis
         }
 
+        // Now we're creating a new analysis - show the loading state
+        setIsCreatingNewAnalysis(true);
         console.log('🔄 Creating new analysis for niche:', niche);
 
         // Create new analysis with query params
@@ -250,14 +255,33 @@ export default function ResultsPage() {
   }, [niche, analysisId, router, session?.access_token, authLoading]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-background px-6 py-12">
-        <div className="max-w-6xl mx-auto">
-          <ResultsHeader niche={niche} />
-          <LoadingState />
+    // Only show "Scan in progress" if we're creating a new analysis
+    // If loading an existing analysis (from dashboard), show minimal loader
+    if (isCreatingNewAnalysis) {
+      return (
+        <div className="min-h-screen bg-background px-6 py-12">
+          <div className="max-w-6xl mx-auto">
+            <ResultsHeader niche={niche} />
+            <LoadingState />
+          </div>
         </div>
-      </div>
-    );
+      );
+    } else {
+      // Simple loader for existing analysis
+      return (
+        <div className="min-h-screen bg-background px-6 py-12">
+          <div className="max-w-6xl mx-auto">
+            <ResultsHeader niche={niche} />
+            <div className="glass-card p-12 text-center">
+              <div className="inline-flex items-center justify-center gap-3">
+                <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <span className="text-muted-foreground">Loading analysis...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
   }
 
   if (error) {
