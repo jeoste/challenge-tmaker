@@ -308,7 +308,29 @@ export async function POST(request: NextRequest) {
         }
 
         // 4. Quick filter - strict filtering for pain points only
-        const filtered = posts.filter(quickFilter);
+        let filtered = posts.filter(quickFilter);
+        
+        // 4.1. Fallback: If quickFilter is too strict and filters everything,
+        // use a more permissive filter to ensure we have at least some candidates
+        if (filtered.length === 0 && posts.length > 0) {
+            console.warn(`[Filter] Quick filter removed all posts. Using permissive fallback filter.`);
+            // More permissive: just exclude obvious non-business content, keep everything else
+            const excludePatterns = [
+                /^(stop|don't|never|warning|security|api key|password|credential)/i,
+                /^(i|we) (just|recently|finally) (built|created|made|launched|released)/i,
+                /check out (my|our|this) (project|app|tool|website)/i,
+            ];
+            filtered = posts.filter(post => {
+                const text = `${post.title} ${post.selftext}`.toLowerCase();
+                // Only exclude if it's clearly non-business AND has no engagement
+                const isExcluded = excludePatterns.some(pattern => pattern.test(text));
+                const hasEngagement = (post.score > 0 || post.num_comments > 0);
+                const hasContent = post.title.length > 10 || post.selftext.length > 20;
+                // Keep if: not excluded, OR has engagement, OR has content
+                return (!isExcluded || hasEngagement) && hasContent;
+            });
+            console.log(`[Filter] Permissive filter found ${filtered.length} posts`);
+        }
 
         // 4.5. Group similar posts for counting
         function groupSimilarPosts(posts: RedditPost[]): Map<string, number> {
@@ -390,7 +412,10 @@ export async function POST(request: NextRequest) {
         // Always ensure we have at least 1-3 results
         let filteredResults = rescored;
 
-        if (filteredResults.length === 0 && scored.length > 0) {
+        // Enhanced fallback: try multiple strategies to ensure we have results
+        if (filteredResults.length === 0) {
+            // Strategy 1: Use top scored posts if available
+            if (scored.length > 0) {
             console.warn(`[Fallback] LLM filtered all posts. Using top ${Math.min(3, scored.length)} posts by engagement score.`);
             // Use top posts by engagement (score + comments) from different subreddits
             const subredditGroups = new Map<string, typeof scored>();
@@ -433,7 +458,44 @@ export async function POST(request: NextRequest) {
                 postsCount: post.similarPostsCount || 1
             }));
 
-            console.log(`[Fallback] Selected ${filteredResults.length} posts from ${subredditGroups.size} subreddits`);
+                console.log(`[Fallback] Selected ${filteredResults.length} posts from ${subredditGroups.size} subreddits`);
+            } else if (filtered.length > 0) {
+                // Strategy 2: If scored is empty but filtered has posts, use those
+                console.warn(`[Fallback] No scored posts available. Using top ${Math.min(5, filtered.length)} posts from filtered set.`);
+                const topFiltered = filtered
+                    .sort((a, b) => {
+                        const aEng = (a.score * 1.0) + (a.num_comments * 3.0);
+                        const bEng = (b.score * 1.0) + (b.num_comments * 3.0);
+                        return bEng - aEng;
+                    })
+                    .slice(0, 5);
+                
+                filteredResults = topFiltered.map(post => ({
+                    ...post,
+                    isOpportunity: true,
+                    relevanceScore: 0.8, // Lower relevance but still valid
+                    goldScore: Math.round(calculateGoldScore(post, 0.8)),
+                    postsCount: similarCounts.get(post.id) || 1
+                }));
+            } else if (posts.length > 0) {
+                // Strategy 3: Last resort - use top posts from original set (even unfiltered)
+                console.warn(`[Fallback] No filtered posts available. Using top ${Math.min(3, posts.length)} posts from original set.`);
+                const topOriginal = posts
+                    .sort((a, b) => {
+                        const aEng = (a.score * 1.0) + (a.num_comments * 3.0);
+                        const bEng = (b.score * 1.0) + (b.num_comments * 3.0);
+                        return bEng - aEng;
+                    })
+                    .slice(0, 3);
+                
+                filteredResults = topOriginal.map(post => ({
+                    ...post,
+                    isOpportunity: true,
+                    relevanceScore: 0.7, // Lower relevance but still show something
+                    goldScore: Math.round(calculateGoldScore(post, 0.7)),
+                    postsCount: 1
+                }));
+            }
         }
 
         // 7.6. Apply plan-based limitations for free users

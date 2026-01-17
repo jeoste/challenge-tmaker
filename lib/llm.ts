@@ -111,7 +111,7 @@ For each post, evaluate with a relevanceScore between 0.7 and 1.5:
 - 0.7 = Marginal post but with potential
 - 0.5 = Not an opportunity (reject only if really not relevant)
 
-IMPORTANT: You MUST identify at least 3 opportunities. If you don't find 3 obvious posts, choose the 3 best even if they're not perfect.
+CRITICAL: You MUST identify at least 1-3 opportunities. Be PERMISSIVE - it's better to show a result with a lower score than to show nothing. If you don't find obvious opportunities, choose the best posts even if they're not perfect. Prioritize posts with engagement (upvotes/comments) as they indicate validated needs.
 
 Posts:
 ${postsList}
@@ -154,7 +154,7 @@ Respond in strict JSON (array only, no text before/after):
             throw new Error('LLM returned invalid format: expected array');
         }
 
-        return posts
+        const result = posts
             .map((post, i) => {
                 const analysisItem = analysis.find(a => a.index === i);
                 return {
@@ -164,6 +164,27 @@ Respond in strict JSON (array only, no text before/after):
                 };
             })
             .filter(p => p.isOpportunity);
+        
+        // Fallback: If LLM filtered everything, keep at least the top 3 posts by engagement
+        // This ensures we always have some results to show
+        if (result.length === 0 && posts.length > 0) {
+            console.warn('[LLM] All posts were filtered. Using top 3 posts by engagement as fallback.');
+            const topByEngagement = posts
+                .sort((a, b) => {
+                    const aEng = (a.score * 1.0) + (a.num_comments * 3.0);
+                    const bEng = (b.score * 1.0) + (b.num_comments * 3.0);
+                    return bEng - aEng;
+                })
+                .slice(0, 3)
+                .map(post => ({
+                    ...post,
+                    isOpportunity: true,
+                    relevanceScore: 0.8 // Lower relevance but still valid
+                }));
+            return topByEngagement;
+        }
+        
+        return result;
     } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         // Check for quota errors

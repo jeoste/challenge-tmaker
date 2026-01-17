@@ -43,7 +43,7 @@ const EXCLUDE_PATTERNS = [
 export function quickFilter(post: RedditPost): boolean {
     const text = `${post.title} ${post.selftext}`.toLowerCase();
     
-    // First check: exclude non-business content
+    // First check: exclude non-business content (but be more lenient)
     if (EXCLUDE_PATTERNS.some(pattern => pattern.test(text))) {
         // But allow if it also contains business patterns (might be relevant)
         const hasBusinessPattern = BUSINESS_PATTERNS.some(pattern => pattern.test(text));
@@ -52,16 +52,24 @@ export function quickFilter(post: RedditPost): boolean {
         }
     }
     
-    // Second check: must match at least one business pattern
+    // Second check: must match at least one business pattern OR have good engagement
     const matchesBusinessPattern = BUSINESS_PATTERNS.some(pattern => pattern.test(text));
     
     // Third check: must have minimum engagement (at least 1 upvote or 1 comment)
+    // OR have a meaningful title (even without engagement, if it matches patterns)
     const hasEngagement = (post.score > 0 || post.num_comments > 0);
+    const hasGoodEngagement = (post.score >= 5 || post.num_comments >= 3);
     
-    // Fourth check: must have some content (title + selftext should be meaningful)
-    const hasContent = post.title.length > 20 || post.selftext.length > 50;
+    // Fourth check: must have some content (more lenient - shorter titles OK)
+    const hasContent = post.title.length > 15 || post.selftext.length > 30;
     
-    return matchesBusinessPattern && hasEngagement && hasContent;
+    // More permissive: accept if:
+    // 1. Matches business pattern AND has engagement AND has content (original strict rule)
+    // 2. OR matches business pattern AND has good engagement (even if content is shorter)
+    // 3. OR has very good engagement (10+ upvotes or 5+ comments) even without explicit business pattern
+    return (matchesBusinessPattern && hasEngagement && hasContent) ||
+           (matchesBusinessPattern && hasGoodEngagement) ||
+           (hasGoodEngagement && hasContent);
 }
 
 // Patterns that indicate high business value
